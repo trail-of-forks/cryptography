@@ -43,7 +43,7 @@ class PKCS7Options(utils.Enum):
     NoCapabilities = "Don't embed SMIME capabilities"
     NoAttributes = "Don't embed authenticatedAttributes"
     NoCerts = "Don't embed signer certificate"
-
+    NoChain = "Don't use certificates in the signed message as untrusted CAs"
 
 class PKCS7SignatureBuilder:
     def __init__(
