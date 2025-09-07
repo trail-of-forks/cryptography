@@ -353,6 +353,10 @@ pub static PKCS7_DETACHED_SIGNATURE: LazyPyImport = LazyPyImport::new(
     "cryptography.hazmat.primitives.serialization.pkcs7",
     &["PKCS7Options", "DetachedSignature"],
 );
+pub static PKCS7_NO_CHAIN: LazyPyImport = LazyPyImport::new(
+    "cryptography.hazmat.primitives.serialization.pkcs7",
+    &["PKCS7Options", "NoChain"],
+);
 
 pub static SMIME_ENVELOPED_ENCODE: LazyPyImport = LazyPyImport::new(
     "cryptography.hazmat.primitives.serialization.pkcs7",
