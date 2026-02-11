@@ -16,6 +16,7 @@ pub(crate) mod tests {
     use crate::certificate::Certificate;
     use crate::ops::tests::{cert, v1_cert_pem};
     use crate::ops::CryptoOps;
+    use cryptography_x509::crl::CertificateRevocationList;
 
     #[test]
     fn test_certificate_v1() {
@@ -70,6 +71,14 @@ Xw4nMqk=
             Ok(())
         }
 
+        fn verify_crl_signature(
+            &self,
+            _crl: &CertificateRevocationList<'_>,
+            _key: &Self::Key,
+        ) -> Result<(), Self::Err> {
+            Ok(())
+        }
+
         fn clone_public_key(key: &Self::Key) -> Self::Key {
             key.clone()
         }
@@ -102,5 +111,25 @@ Xw4nMqk=
 
         assert!(ops.public_key(&cert).is_err());
         assert!(ops.verify_signed_by(&cert, &()).is_ok());
+
+        // From vectors/cryptography_vectors/x509/custom/crl_empty.pem
+        let crl_pem = pem::parse(
+            "-----BEGIN X509 CRL-----
+MIIBxTCBrgIBATANBgkqhkiG9w0BAQUFADBhMQswCQYDVQQGEwJVUzERMA8GA1UE
+CAwISWxsaW5vaXMxEDAOBgNVBAcMB0NoaWNhZ28xETAPBgNVBAoMCHI1MDkgTExD
+MRowGAYDVQQDDBFyNTA5IENSTCBEZWxlZ2F0ZRcNMTUxMjIwMjM0NDQ3WhcNMTUx
+MjI4MDA0NDQ3WqAZMBcwCgYDVR0UBAMCAQEwCQYDVR0jBAIwADANBgkqhkiG9w0B
+AQUFAAOCAQEAXebqoZfEVAC4NcSEB5oGqUviUn/AnY6TzB6hUe8XC7yqEkBcyTgk
+G1Zq+b+T/5X1ewTldvuUqv19WAU/Epbbu4488PoH5qMV8Aii2XcotLJOR9OBANp0
+Yy4ir/n6qyw8kM3hXJloE+xgkELhd5JmKCnlXihM1BTl7Xp7jyKeQ86omR+DhItb
+CU+9RoqOK9Hm087Z7RurXVrz5RKltQo7VLCp8VmrxFwfALCZENXGEQ+g5VkvoCjc
+ph5jqOSyzp7aZy1pnLE/6U6V32ItskrwqA+x4oj2Wvzir/Q23y2zYfqOkuq4fTd2
+lWW+w5mB167fIWmd6efecDn1ZqbdECDPUg==
+-----END X509 CRL-----",
+        )
+        .unwrap();
+        let crl: CertificateRevocationList<'_> =
+            asn1::parse_single(crl_pem.contents()).unwrap();
+        assert!(ops.verify_crl_signature(&crl, &()).is_ok());
     }
 }

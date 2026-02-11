@@ -5,6 +5,7 @@
 use std::sync::OnceLock;
 
 use cryptography_x509::certificate::Certificate;
+use cryptography_x509::crl::CertificateRevocationList;
 
 pub struct VerificationCertificate<'a, B: CryptoOps> {
     cert: &'a Certificate<'a>,
@@ -89,6 +90,14 @@ pub trait CryptoOps {
     /// Verifies the signature on `Certificate` using the given
     /// `Key`.
     fn verify_signed_by(&self, cert: &Certificate<'_>, key: &Self::Key) -> Result<(), Self::Err>;
+
+    /// Verifies the signature on a `CertificateRevocationList` using the given
+    /// `Key`.
+    fn verify_crl_signature(
+        &self,
+        crl: &CertificateRevocationList<'_>,
+        key: &Self::Key,
+    ) -> Result<(), Self::Err>;
 
     // Makes a `clone` of `Key`
     fn clone_public_key(extra: &Self::Key) -> Self::Key;

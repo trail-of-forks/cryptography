@@ -3,6 +3,7 @@
 // for complete details.
 
 use cryptography_x509::certificate::Certificate;
+use cryptography_x509::crl::CertificateRevocationList;
 use cryptography_x509::extensions::SubjectAlternativeName;
 use cryptography_x509::oid::SUBJECT_ALTERNATIVE_NAME_OID;
 use cryptography_x509_verification::ops::{CryptoOps, VerificationCertificate};
@@ -47,6 +48,22 @@ impl CryptoOps for PyCryptoOps {
                 &cert.signature_alg,
                 cert.signature.as_bytes(),
                 &asn1::write_single(&cert.tbs_cert)?,
+            )
+        })
+    }
+
+    fn verify_crl_signature(
+        &self,
+        crl: &CertificateRevocationList<'_>,
+        key: &Self::Key,
+    ) -> Result<(), Self::Err> {
+        pyo3::Python::attach(|py| {
+            sign::verify_signature_with_signature_algorithm(
+                py,
+                key.bind(py).clone(),
+                &crl.signature_algorithm,
+                crl.signature_value.as_bytes(),
+                &asn1::write_single(&crl.tbs_cert_list)?,
             )
         })
     }
