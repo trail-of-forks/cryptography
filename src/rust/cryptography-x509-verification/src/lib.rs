@@ -9,6 +9,7 @@
 pub mod certificate;
 pub mod ops;
 pub mod policy;
+pub mod revocation;
 pub mod trust_store;
 pub mod types;
 
