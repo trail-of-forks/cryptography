@@ -13,10 +13,16 @@ use cryptography_x509::{
     oid::{BASIC_CONSTRAINTS_OID, CRL_DISTRIBUTION_POINTS_OID, ISSUING_DISTRIBUTION_POINT_OID},
 };
 
-use crate::{ops::CryptoOps, policy::Policy, Chain};
+use crate::{
+    ops::CryptoOps, policy::Policy, Chain, ValidationError, ValidationErrorKind, ValidationResult,
+};
 
 pub trait RevocationChecker<'a, B: CryptoOps> {
-    fn is_revoked(&self, cert: &Certificate<'_>, context: &Chain<'a, B>) -> bool;
+    fn is_revoked(
+        &self,
+        cert: &Certificate<'_>,
+        context: &Chain<'a, B>,
+    ) -> ValidationResult<'_, bool, B>;
 }
 
 /// https://datatracker.ietf.org/doc/html/rfc5280#section-6.3
@@ -73,7 +79,7 @@ fn crl_applicable_to_cert(
     let mut dp_names_match = false;
     for dp in dps {
         // XX(tnytown): shouldn't be necessary, but rust-analyzer can't infer the type without?
-        let _dp: &DistributionPoint<'_, Asn1Read> = &dp;
+        let _: &DistributionPoint<'_, Asn1Read> = &dp;
 
         let DistributionPointName::FullName(dp_names) = dp.distribution_point? else {
             return None;
@@ -120,44 +126,52 @@ fn crl_applicable_to_cert(
 }
 
 impl<'a, B: CryptoOps> RevocationChecker<'a, B> for CRLRevocationChecker<'a, B> {
-    fn is_revoked(&self, cert: &Certificate<'_>, context: &Chain<'a, B>) -> bool {
-        // First, find the complete CRL that applies to this certificate, failing open if there is
-        // no such CRL.
+    fn is_revoked(
+        &self,
+        cert: &Certificate<'_>,
+        context: &Chain<'a, B>,
+    ) -> ValidationResult<'_, bool, B> {
+        // First, find the complete CRL that applies to this certificate, failing with a
+        // ValidationError if none are found.
         //
         // We don't support CRL partitioning by reason code, so we shouldn't care about any CRL
         // beyond the first that meets our criteria.
-        let Some(crl) = self.crls.iter().find(|crl| {
-            if crl_applicable_to_cert(crl, cert).is_none() {
-                return false;
-            }
-
-            // We may have temporally partitioned CRLs in CABF parlance, so check the time from within
-            // `find()` here and avoid discarding the CRL that covers the correct time.
-            if &self.policy.validation_time < crl.tbs_cert_list.this_update.as_datetime() {
-                return false;
-            }
-
-            if let Some(ref next_update) = crl.tbs_cert_list.next_update {
-                if &self.policy.validation_time > next_update.as_datetime() {
+        let crl = self
+            .crls
+            .iter()
+            .find(|crl| {
+                if crl_applicable_to_cert(crl, cert).is_none() {
                     return false;
                 }
-            }
 
-            return true;
-        }) else {
-            return false;
-        };
+                // We may have temporally partitioned CRLs in CABF parlance, so check the time from within
+                // `find()` here and avoid discarding the CRL that covers the correct time.
+                if &self.policy.validation_time < crl.tbs_cert_list.this_update.as_datetime() {
+                    return false;
+                }
+
+                if let Some(ref next_update) = crl.tbs_cert_list.next_update {
+                    if &self.policy.validation_time > next_update.as_datetime() {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .ok_or(ValidationError::new(
+                ValidationErrorKind::RevocationNotDetermined("no applicable CRLs found".into()),
+            ))?;
 
         // Verify that certificate's issuer signed the CRL.
-        let issuer = &context[context.len() - 2];
+        let issuer = &context[1];
         let pk = match issuer.public_key(&self.policy.ops) {
             Ok(pk) => pk,
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         };
-        if self.policy.ops.verify_crl_signed_by(crl, pk).is_err() {
-            return false;
-        }
 
+        if self.policy.ops.verify_crl_signed_by(crl, pk).is_err() {
+            return Ok(false);
+        }
         // TODO(tnytown): verify extensions here
         // check issuer keyUsage
         // check CRL extensions, criticality
@@ -167,12 +181,12 @@ impl<'a, B: CryptoOps> RevocationChecker<'a, B> for CRLRevocationChecker<'a, B> 
         if let Some(ref revoked_certs) = crl.tbs_cert_list.revoked_certificates {
             for revoked in revoked_certs.unwrap_read().clone() {
                 if revoked.user_certificate.as_bytes() == cert.tbs_cert.serial.as_bytes() {
-                    return true;
+                    return Ok(true);
                 }
             }
         }
 
-        false
+        Ok(false)
     }
 }
 
