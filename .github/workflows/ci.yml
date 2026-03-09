@@ -40,8 +40,8 @@ jobs:
           - {VERSION: "3.14", NOXSESSION: "tests-ssh", OPENSSL: {TYPE: "openssl", VERSION: "3.6.1"}}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "libressl", VERSION: "4.1.2"}}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "libressl", VERSION: "4.2.1"}}
-          # Latest commit on the BoringSSL main branch, as of Feb 27, 2026.
-          - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "boringssl", VERSION: "80053a9bb7260a6979d09c19157136e59d97db76"}}
+          # Latest commit on the BoringSSL main branch, as of Mar 09, 2026.
+          - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "boringssl", VERSION: "a218d49e02183a4b5d6ff2c3e4343bf4bbdfdc50"}}
           # Latest tag of AWS-LC main branch, as of Mar 03, 2026.
           - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "aws-lc", VERSION: "v1.69.0"}}
           # Latest commit on the OpenSSL master branch, as of Sep 04, 2025.
@@ -315,7 +315,7 @@ jobs:
         timeout-minutes: 2
         uses: ./.github/actions/fetch-vectors
 
-      - uses: dawidd6/action-download-artifact@fe9d59ce33ce92db8a6ac90b2c8be6b6d90417c8 # v15
+      - uses: dawidd6/action-download-artifact@2536c51d3d126276eb39f74d6bc9c72ac6ef30d3 # v16
         with:
           repo: pyca/infra
           workflow: build-macos-openssl.yml
@@ -376,7 +376,7 @@ jobs:
           key: ${{ matrix.PYTHON.NOXSESSION }}-${{ matrix.WINDOWS.ARCH }}-${{ steps.setup-python.outputs.python-version }}
       - run: python -m pip install -c ci-constraints-requirements.txt "nox[uv]" "tomli; python_version < '3.11'"
 
-      - uses: dawidd6/action-download-artifact@fe9d59ce33ce92db8a6ac90b2c8be6b6d90417c8 # v15
+      - uses: dawidd6/action-download-artifact@2536c51d3d126276eb39f74d6bc9c72ac6ef30d3 # v16
         with:
           repo: pyca/infra
           workflow: build-windows-openssl.yml
@@ -429,8 +429,8 @@ jobs:
             PATH: pyopenssl
           - DOWNSTREAM: twisted
             REPO: twisted/twisted
-            # Latest commit on the twisted trunk branch, as of Mar 02, 2026.
-            REF: 508c44f0dabf00398c03c00e9bd9dc3d3d7e72e6
+            # Latest commit on the twisted trunk branch, as of Mar 08, 2026.
+            REF: 3f54c19053291c3d7a4d8fed917cc8adcc702bea
             PATH: twisted
           - DOWNSTREAM: aws-encryption-sdk-python
             REPO: awslabs/aws-encryption-sdk-python
@@ -444,28 +444,28 @@ jobs:
             PATH: aws-dynamodb-encryption-python
           - DOWNSTREAM: certbot
             REPO: certbot/certbot
-            # Latest commit on the certbot main branch, as of Feb 27, 2026.
-            REF: 15e73753a66b276d2dc5c5abbe399300e5a2ab73
+            # Latest commit on the certbot main branch, as of Mar 07, 2026.
+            REF: c31974128b511542cfff152c8f2e561dce491f01
             PATH: certbot
           - DOWNSTREAM: certbot-josepy
             REPO: certbot/josepy
-            # Latest commit on the certbot-josepy main branch, as of Feb 12, 2026.
-            REF: 747709abb486b381bb93c7cc96e1432642f9eeb2
+            # Latest commit on the certbot-josepy main branch, as of Mar 07, 2026.
+            REF: e510d39fabe0f07314d73bca84570c0c2f297afa
             PATH: josepy
           - DOWNSTREAM: mitmproxy
             REPO: mitmproxy/mitmproxy
-            # Latest commit on the mitmproxy main branch, as of Feb 11, 2026.
-            REF: 50ba950494e79d8049a691c8d5373d1a3c232ea1
+            # Latest commit on the mitmproxy main branch, as of Mar 09, 2026.
+            REF: 2a7bb7ba05a9a1c14b4fd7674d5356bc665a4182
             PATH: mitmproxy
           - DOWNSTREAM: scapy
             REPO: secdev/scapy
-            # Latest commit on the scapy master branch, as of Mar 03, 2026.
-            REF: ed0707e84396b4db5382d281b86f85997cb13613
+            # Latest commit on the scapy master branch, as of Mar 07, 2026.
+            REF: 9802dca4186c1e84494bb33b33a8e6c5e91a08ba
             PATH: scapy
           - DOWNSTREAM: sigstore-python
             REPO: sigstore/sigstore-python
-            # Latest commit on the sigstore-python main branch, as of Feb 28, 2026.
-            REF: 90e02015b3e734df3e1d5f93bbe97ddb92ed6f71
+            # Latest commit on the sigstore-python main branch, as of Mar 08, 2026.
+            REF: e1498bc0194bab8a1f1779be5afb27ef7ac416d0
             PATH: sigstore-python
     name: "Downstream tests for ${{ matrix.DOWNSTREAM }}"
     timeout-minutes: 15
@@ -566,7 +566,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           exit $COV_EXIT_CODE
       - name: Upload HTML report.
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: _html-coverage-report
           path: htmlcov
