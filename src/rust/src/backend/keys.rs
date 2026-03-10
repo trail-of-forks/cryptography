@@ -33,22 +33,29 @@ pub(crate) fn load_der_private_key_bytes<'p>(
     password: Option<&[u8]>,
     unsafe_skip_rsa_key_validation: bool,
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
-    let parsers: [fn(&[u8]) -> cryptography_key_parsing::KeyParsingResult<_>; 4] = [
+    let parsers: [cryptography_key_parsing::PrivateKeyParser; 4] = [
         cryptography_key_parsing::pkcs8::parse_private_key,
-        |d| cryptography_key_parsing::ec::parse_pkcs1_private_key(d, None),
-        cryptography_key_parsing::rsa::parse_pkcs1_private_key,
-        cryptography_key_parsing::dsa::parse_pkcs1_private_key,
+        |d| {
+            cryptography_key_parsing::ec::parse_pkcs1_private_key(d, None)
+                .map(cryptography_key_parsing::ParsedPrivateKey::Pkey)
+        },
+        |d| {
+            cryptography_key_parsing::rsa::parse_pkcs1_private_key(d)
+                .map(cryptography_key_parsing::ParsedPrivateKey::Pkey)
+        },
+        |d| {
+            cryptography_key_parsing::dsa::parse_pkcs1_private_key(d)
+                .map(cryptography_key_parsing::ParsedPrivateKey::Pkey)
+        },
     ];
 
-    let pkey = parsers.iter().find_map(|parser| match parser(data) {
+    let parsed = parsers.iter().find_map(|parser| match parser(data) {
         Ok(key) => Some(Ok(key)),
-        // Try next parser
         Err(cryptography_key_parsing::KeyParsingError::Parse(_)) => None,
-        // Return non-parse errors immediately
         Err(e) => Some(Err(e)),
     });
 
-    if let Some(Ok(pkey)) = pkey {
+    if let Some(Ok(parsed)) = parsed {
         if password.is_some() {
             return Err(CryptographyError::from(
                 pyo3::exceptions::PyTypeError::new_err(
@@ -56,14 +63,13 @@ pub(crate) fn load_der_private_key_bytes<'p>(
                 ),
             ));
         }
-        return private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation);
-    } else if let Some(Err(e)) = pkey {
+        return private_key_from_parsed(py, parsed, unsafe_skip_rsa_key_validation);
+    } else if let Some(Err(e)) = parsed {
         return Err(e.into());
     }
 
-    let pkey = cryptography_key_parsing::pkcs8::parse_encrypted_private_key(data, password)?;
-
-    private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation)
+    let parsed = cryptography_key_parsing::pkcs8::parse_encrypted_private_key(data, password)?;
+    private_key_from_parsed(py, parsed, unsafe_skip_rsa_key_validation)
 }
 
 #[pyo3::pyfunction]
@@ -85,15 +91,15 @@ fn load_pem_private_key<'p>(
     let password = password.as_ref().map(|v| v.as_bytes());
     let (data, mut password_used) = cryptography_key_parsing::pem::decrypt_pem(&p, password)?;
 
-    let pkey = match p.tag() {
+    let parsed = match p.tag() {
         "PRIVATE KEY" => cryptography_key_parsing::pkcs8::parse_private_key(&data)?,
-        "RSA PRIVATE KEY" => cryptography_key_parsing::rsa::parse_pkcs1_private_key(&data).map_err(|e| {
+        "RSA PRIVATE KEY" => cryptography_key_parsing::rsa::parse_pkcs1_private_key(&data).map(cryptography_key_parsing::ParsedPrivateKey::Pkey).map_err(|e| {
             CryptographyError::from(e).add_note(py, "If your key is in PKCS#8 format, you must use BEGIN/END PRIVATE KEY PEM delimiters")
         })?,
-        "EC PRIVATE KEY" => cryptography_key_parsing::ec::parse_pkcs1_private_key(&data, None).map_err(|e| {
+        "EC PRIVATE KEY" => cryptography_key_parsing::ec::parse_pkcs1_private_key(&data, None).map(cryptography_key_parsing::ParsedPrivateKey::Pkey).map_err(|e| {
             CryptographyError::from(e).add_note(py, "If your key is in PKCS#8 format, you must use BEGIN/END PRIVATE KEY PEM delimiters")
         })?,
-        "DSA PRIVATE KEY" => cryptography_key_parsing::dsa::parse_pkcs1_private_key(&data).map_err(|e| {
+        "DSA PRIVATE KEY" => cryptography_key_parsing::dsa::parse_pkcs1_private_key(&data).map(cryptography_key_parsing::ParsedPrivateKey::Pkey).map_err(|e| {
             CryptographyError::from(e).add_note(py, "If your key is in PKCS#8 format, you must use BEGIN/END PRIVATE KEY PEM delimiters")
         })?,
         _ => {
@@ -109,7 +115,7 @@ fn load_pem_private_key<'p>(
             ),
         ));
     }
-    private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation)
+    private_key_from_parsed(py, parsed, unsafe_skip_rsa_key_validation)
 }
 
 fn private_key_from_pkey<'p>(
@@ -173,6 +179,29 @@ fn private_key_from_pkey<'p>(
     }
 }
 
+fn private_key_from_parsed<'p>(
+    py: pyo3::Python<'p>,
+    parsed: cryptography_key_parsing::ParsedPrivateKey,
+    unsafe_skip_rsa_key_validation: bool,
+) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
+    match parsed {
+        cryptography_key_parsing::ParsedPrivateKey::Pkey(pkey) => {
+            private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation)
+        }
+    }
+}
+
+fn public_key_from_parsed<'p>(
+    py: pyo3::Python<'p>,
+    parsed: cryptography_key_parsing::ParsedPublicKey,
+) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
+    match parsed {
+        cryptography_key_parsing::ParsedPublicKey::Pkey(pkey) => {
+            public_key_from_pkey(py, &pkey, pkey.id())
+        }
+    }
+}
+
 #[pyo3::pyfunction]
 #[pyo3(signature = (data, backend=None))]
 fn load_der_public_key<'p>(
@@ -189,7 +218,7 @@ pub(crate) fn load_der_public_key_bytes<'p>(
     data: &[u8],
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
     match cryptography_key_parsing::spki::parse_public_key(data) {
-        Ok(pkey) => public_key_from_pkey(py, &pkey, pkey.id()),
+        Ok(parsed) => public_key_from_parsed(py, parsed),
         // It's not a (RSA/DSA/ECDSA) subjectPublicKeyInfo, but we still need
         // to check to see if it is a pure PKCS1 RSA public key (not embedded
         // in a subjectPublicKeyInfo)
@@ -219,20 +248,29 @@ fn load_pem_public_key<'p>(
             match cryptography_key_parsing::rsa::parse_pkcs1_public_key(p.contents()) {
                 Ok(pkey) => pkey,
                 Err(err) => {
-                    let pkey = cryptography_key_parsing::spki::parse_public_key(p.contents())
+                    let parsed = cryptography_key_parsing::spki::parse_public_key(p.contents())
                         .map_err(|_| err)?;
-                    if pkey.id() != openssl::pkey::Id::RSA {
-                        return Err(CryptographyError::from(
-                            pyo3::exceptions::PyValueError::new_err(
-                                "Incorrect PEM delimiter for key type.",
-                            ),
-                        ));
+                    match parsed {
+                        cryptography_key_parsing::ParsedPublicKey::Pkey(pkey)
+                            if pkey.id() == openssl::pkey::Id::RSA =>
+                        {
+                            pkey
+                        }
+                        _ => {
+                            return Err(CryptographyError::from(
+                                pyo3::exceptions::PyValueError::new_err(
+                                    "Incorrect PEM delimiter for key type.",
+                                ),
+                            ));
+                        }
                     }
-                    pkey
                 }
             }
         }
-        "PUBLIC KEY" => cryptography_key_parsing::spki::parse_public_key(p.contents())?,
+        "PUBLIC KEY" => {
+            let parsed = cryptography_key_parsing::spki::parse_public_key(p.contents())?;
+            return public_key_from_parsed(py, parsed);
+        }
         _ => return Err(CryptographyError::from(pyo3::exceptions::PyValueError::new_err(
             "Valid PEM but no BEGIN PUBLIC KEY/END PUBLIC KEY delimiters. Are you sure this is a public key?"
         ))),
