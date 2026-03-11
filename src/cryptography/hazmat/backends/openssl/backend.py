@@ -290,6 +290,9 @@ class Backend:
             and not self._fips_enabled
         )
 
+    def slhdsa_supported(self) -> bool:
+        return rust_openssl.CRYPTOGRAPHY_IS_BORINGSSL
+
     def poly1305_supported(self) -> bool:
         return not self._fips_enabled
 

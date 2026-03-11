@@ -24,6 +24,8 @@ pub(crate) mod keys;
 pub(crate) mod poly1305;
 pub(crate) mod rand;
 pub(crate) mod rsa;
+#[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+pub(crate) mod slhdsa;
 pub(crate) mod utils;
 pub(crate) mod x25519;
 #[cfg(not(any(
