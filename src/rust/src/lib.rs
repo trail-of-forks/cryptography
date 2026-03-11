@@ -245,6 +245,9 @@ mod _rust {
         use crate::backend::poly1305::poly1305;
         #[pymodule_export]
         use crate::backend::rsa::rsa;
+        #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+        #[pymodule_export]
+        use crate::backend::slhdsa::slhdsa;
         #[pymodule_export]
         use crate::backend::x25519::x25519;
         #[cfg(not(any(

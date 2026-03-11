@@ -16,6 +16,8 @@ pub mod hmac;
 ))]
 pub mod poly1305;
 pub mod rand;
+#[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+pub mod slhdsa;
 pub mod utils;
 
 pub type OpenSSLResult<T> = Result<T, openssl::error::ErrorStack>;
