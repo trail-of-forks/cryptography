@@ -85,6 +85,10 @@ class SlhDsa256PublicKey(metaclass=abc.ABCMeta):
         """
 
 
+if hasattr(rust_openssl, "slhdsa"):
+    SlhDsa256PublicKey.register(rust_openssl.slhdsa.SlhDsa256PublicKey)
+
+
 class SlhDsa256PrivateKey(metaclass=abc.ABCMeta):
     @classmethod
     def generate(
@@ -170,5 +174,4 @@ class SlhDsa256PrivateKey(metaclass=abc.ABCMeta):
 
 
 if hasattr(rust_openssl, "slhdsa"):
-    SlhDsa256PublicKey.register(rust_openssl.slhdsa.SlhDsa256PublicKey)
     SlhDsa256PrivateKey.register(rust_openssl.slhdsa.SlhDsa256PrivateKey)

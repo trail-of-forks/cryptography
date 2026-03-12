@@ -65,15 +65,14 @@ Asymmetric ciphers
 * ``asymmetric/PKCS8/ed25519-scrypt.pem`` a PKCS8 encoded Ed25519 key from
   RustCrypto using scrypt as the KDF. The password is ``hunter42``.
 * FIPS 204 ML-DSA-{44,65,87} KAT vectors from `post-quantum-cryptography/KAT`_.
-* FIPS 205 SLH-DSA sigVer vectors from `NIST ACVP-Server`_
-  (``SLH-DSA-sigVer-FIPS205/internalProjection.json``). Filtered from the
+* FIPS 205 SLH-DSA sigVer and keyGen vectors from `NIST ACVP-Server`_
+  (``SLH-DSA-sigVer-FIPS205/internalProjection.json`` and
+  ``SLH-DSA-keyGen-FIPS205/internalProjection.json``). Filtered from the
   full upstream data:
 
   - Only SLH-DSA-SHA2-128s and SLH-DSA-SHAKE-256f parameter sets are kept
     (the two sets supported by the BoringSSL API).
-  - Only pure and external interface vectors are kept.
-  - keyGen vectors are excluded because BoringSSL does not expose a method
-    to generate a private key from the seed.
+  - Only pure and external interface vectors are kept (sigVer only).
   - sigGen vectors are excluded because the BoringSSL API only supports
     randomized signing, so deterministic test vectors cannot be verified.
 
