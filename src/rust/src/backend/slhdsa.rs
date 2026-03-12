@@ -40,11 +40,15 @@ pub(crate) struct SlhDsa256PublicKey {
 
 #[pyo3::pyfunction]
 fn generate_key(parameter_set: SlhDsaParameterSet) -> SlhDsa256PrivateKey {
-    let (public_key, private_key) = cryptography_openssl::slhdsa::generate_key();
-    SlhDsa256PrivateKey {
-        parameter_set,
-        private_key,
-        public_key,
+    match parameter_set {
+        SlhDsaParameterSet::Shake256f => {
+            let (public_key, private_key) = cryptography_openssl::slhdsa::generate_key();
+            SlhDsa256PrivateKey {
+                parameter_set,
+                private_key,
+                public_key,
+            }
+        }
     }
 }
 
@@ -54,17 +58,21 @@ fn from_private_bytes(
     data: CffiBuf<'_>,
 ) -> pyo3::PyResult<SlhDsa256PrivateKey> {
     let data = data.as_bytes();
-    if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PRIVATE_KEY_BYTES {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "An SLH-DSA-256 private key is 128 bytes long",
-        ));
+    match parameter_set {
+        SlhDsaParameterSet::Shake256f => {
+            if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PRIVATE_KEY_BYTES {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "An SLH-DSA-256 private key is 128 bytes long",
+                ));
+            }
+            let public_key = cryptography_openssl::slhdsa::public_from_private(data);
+            Ok(SlhDsa256PrivateKey {
+                parameter_set,
+                private_key: data.to_vec(),
+                public_key,
+            })
+        }
     }
-    let public_key = cryptography_openssl::slhdsa::public_from_private(data);
-    Ok(SlhDsa256PrivateKey {
-        parameter_set,
-        private_key: data.to_vec(),
-        public_key,
-    })
 }
 
 #[pyo3::pyfunction]
@@ -72,15 +80,19 @@ fn from_public_bytes(
     parameter_set: SlhDsaParameterSet,
     data: &[u8],
 ) -> pyo3::PyResult<SlhDsa256PublicKey> {
-    if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PUBLIC_KEY_BYTES {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "An SLH-DSA-256 public key is 64 bytes long",
-        ));
+    match parameter_set {
+        SlhDsaParameterSet::Shake256f => {
+            if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PUBLIC_KEY_BYTES {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "An SLH-DSA-256 public key is 64 bytes long",
+                ));
+            }
+            Ok(SlhDsa256PublicKey {
+                parameter_set,
+                public_key: data.to_vec(),
+            })
+        }
     }
-    Ok(SlhDsa256PublicKey {
-        parameter_set,
-        public_key: data.to_vec(),
-    })
 }
 
 // NO-COVERAGE-START
