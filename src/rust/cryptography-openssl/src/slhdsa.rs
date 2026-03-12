@@ -2,7 +2,7 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use crate::OpenSSLResult;
+use crate::{cvt, OpenSSLResult};
 
 pub const SHAKE_256F_PUBLIC_KEY_BYTES: usize = 64;
 pub const SHAKE_256F_PRIVATE_KEY_BYTES: usize = 128;
@@ -61,18 +61,17 @@ pub fn sign(private_key: &[u8], data: &[u8], context: &[u8]) -> OpenSSLResult<Ve
     let mut signature = vec![0u8; SHAKE_256F_SIGNATURE_BYTES];
 
     // SAFETY: All pointers and lengths are valid. private_key is validated by caller.
-    let rc = unsafe {
-        SLHDSA_SHAKE_256F_sign(
+    unsafe {
+        let rc = SLHDSA_SHAKE_256F_sign(
             signature.as_mut_ptr(),
             private_key.as_ptr(),
             data.as_ptr(),
             data.len(),
             context.as_ptr(),
             context.len(),
-        )
-    };
-
-    crate::cvt(rc)?;
+        );
+        cvt(rc)?;
+    }
     Ok(signature)
 }
 
@@ -83,8 +82,8 @@ pub fn verify(
     context: &[u8],
 ) -> OpenSSLResult<()> {
     // SAFETY: All pointers and lengths are valid. public_key is validated by caller.
-    let rc = unsafe {
-        SLHDSA_SHAKE_256F_verify(
+    unsafe {
+        let rc = SLHDSA_SHAKE_256F_verify(
             signature.as_ptr(),
             signature.len(),
             public_key.as_ptr(),
@@ -92,9 +91,8 @@ pub fn verify(
             data.len(),
             context.as_ptr(),
             context.len(),
-        )
-    };
-
-    crate::cvt(rc)?;
+        );
+        cvt(rc)?;
+    }
     Ok(())
 }
