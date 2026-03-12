@@ -217,6 +217,16 @@ class TestSlhDsa256:
                 serialization.PublicFormat.SubjectPublicKeyInfo,
             )
 
+    def test_parameter_set(self, backend):
+        private_key = SlhDsa256PrivateKey.generate(
+            SlhDsaParameterSet.SHAKE_256F
+        )
+        assert private_key.parameter_set == SlhDsaParameterSet.SHAKE_256F
+        assert (
+            private_key.public_key().parameter_set
+            == SlhDsaParameterSet.SHAKE_256F
+        )
+
     def test_invalid_parameter_set(self, backend):
         with pytest.raises(TypeError):
             SlhDsa256PrivateKey.generate("not-a-parameter-set")  # type: ignore[arg-type]
