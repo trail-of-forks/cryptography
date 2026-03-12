@@ -43,6 +43,7 @@ decrypted
 decrypting
 deprecations
 DER
+DSA
 dereference
 deserialize
 deserialized
@@ -84,6 +85,7 @@ iOS
 iterable
 Kehrer
 Kerberos
+keyGen
 Keychain
 KiB
 kibibyte
@@ -139,6 +141,9 @@ serializer
 Serializers
 setuptools
 SHA
+SLH
+sigGen
+sigVer
 Solaris
 Sonoma
 SPKI
