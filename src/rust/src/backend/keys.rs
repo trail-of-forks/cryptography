@@ -226,7 +226,7 @@ pub(crate) fn load_der_public_key_bytes<'p>(
             // Use the original error.
             let pkey =
                 cryptography_key_parsing::rsa::parse_pkcs1_public_key(data).map_err(|_| e)?;
-            public_key_from_pkey(py, &pkey, pkey.id())
+            public_key_from_parsed(py, cryptography_key_parsing::ParsedPublicKey::Pkey(pkey))
         }
     }
 }
@@ -240,21 +240,21 @@ fn load_pem_public_key<'p>(
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
     let _ = backend;
     let p = pem::parse(data.as_bytes())?;
-    let pkey = match p.tag() {
+    let parsed = match p.tag() {
         "RSA PUBLIC KEY" => {
             // We try to parse it as a PKCS1 first since that's the PEM delimiter, and if
             // that fails we try to parse it as an SPKI. This is to match the permissiveness
             // of OpenSSL, which doesn't care about the delimiter.
             match cryptography_key_parsing::rsa::parse_pkcs1_public_key(p.contents()) {
-                Ok(pkey) => pkey,
+                Ok(pkey) => cryptography_key_parsing::ParsedPublicKey::Pkey(pkey),
                 Err(err) => {
                     let parsed = cryptography_key_parsing::spki::parse_public_key(p.contents())
                         .map_err(|_| err)?;
                     match parsed {
-                        cryptography_key_parsing::ParsedPublicKey::Pkey(pkey)
+                        cryptography_key_parsing::ParsedPublicKey::Pkey(ref pkey)
                             if pkey.id() == openssl::pkey::Id::RSA =>
                         {
-                            pkey
+                            parsed
                         }
                         _ => {
                             return Err(CryptographyError::from(
@@ -267,15 +267,12 @@ fn load_pem_public_key<'p>(
                 }
             }
         }
-        "PUBLIC KEY" => {
-            let parsed = cryptography_key_parsing::spki::parse_public_key(p.contents())?;
-            return public_key_from_parsed(py, parsed);
-        }
+        "PUBLIC KEY" => cryptography_key_parsing::spki::parse_public_key(p.contents())?,
         _ => return Err(CryptographyError::from(pyo3::exceptions::PyValueError::new_err(
             "Valid PEM but no BEGIN PUBLIC KEY/END PUBLIC KEY delimiters. Are you sure this is a public key?"
         ))),
     };
-    public_key_from_pkey(py, &pkey, pkey.id())
+    public_key_from_parsed(py, parsed)
 }
 
 fn public_key_from_pkey<'p>(
