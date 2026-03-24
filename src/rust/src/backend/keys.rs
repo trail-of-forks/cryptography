@@ -188,6 +188,12 @@ fn private_key_from_parsed<'p>(
         cryptography_key_parsing::ParsedPrivateKey::Pkey(pkey) => {
             private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation)
         }
+        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+        cryptography_key_parsing::ParsedPrivateKey::MlKem768(seed) => {
+            Ok(crate::backend::mlkem::private_key_from_seed(seed)?
+                .into_pyobject(py)?
+                .into_any())
+        }
     }
 }
 
@@ -331,6 +337,17 @@ fn public_key_from_pkey<'p>(
         openssl::pkey::Id::DHX => Ok(crate::backend::dh::public_key_from_pkey(pkey)
             .into_pyobject(py)?
             .into_any()),
+        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+        id if id == cryptography_openssl::mlkem::PKEY_ID => {
+            let pub_len = pkey.raw_public_key()?.len();
+            assert_eq!(
+                pub_len,
+                cryptography_openssl::mlkem::MLKEM768_PUBLIC_KEY_BYTES
+            );
+            Ok(crate::backend::mlkem::public_key_from_pkey(pkey)
+                .into_pyobject(py)?
+                .into_any())
+        }
 
         _ => Err(CryptographyError::from(
             exceptions::UnsupportedAlgorithm::new_err("Unsupported key type."),

@@ -54,6 +54,8 @@ pub type PrivateKeyParser = fn(&[u8]) -> KeyParsingResult<ParsedPrivateKey>;
 
 pub enum ParsedPrivateKey {
     Pkey(openssl::pkey::PKey<openssl::pkey::Private>),
+    #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+    MlKem768([u8; 64]),
 }
 
 pub enum ParsedPublicKey {
