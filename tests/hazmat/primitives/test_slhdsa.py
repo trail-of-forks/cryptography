@@ -7,6 +7,7 @@ import binascii
 import copy
 import json
 import os
+
 import pytest
 
 from cryptography.exceptions import InvalidSignature, _Reasons
@@ -64,9 +65,7 @@ def test_slhdsa_unsupported(backend):
 )
 class TestSlhDsa256:
     def test_sign_verify(self, backend):
-        key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
         sig = key.sign(b"test data")
         key.public_key().verify(sig, b"test data")
 
@@ -78,16 +77,12 @@ class TestSlhDsa256:
         ],
     )
     def test_sign_verify_with_context(self, backend, ctx):
-        key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
         sig = key.sign(b"test data", ctx)
         key.public_key().verify(sig, b"test data", ctx)
 
     def test_context_too_long(self, backend):
-        key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
         with pytest.raises(ValueError):
             key.sign(b"data", b"x" * 256)
         with pytest.raises(ValueError):
