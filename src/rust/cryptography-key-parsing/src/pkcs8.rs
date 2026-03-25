@@ -24,12 +24,64 @@ pub struct PrivateKeyInfo<'a> {
 
 // RFC 9881 Section 6.5
 #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-// NO-COVERAGE-START
-#[derive(asn1::Asn1Read, asn1::Asn1Write)]
-// NO-COVERAGE-END
 enum MlDsaPrivateKey<'a> {
-    #[implicit(0)]
     Seed(&'a [u8]),
+}
+
+#[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+impl<'a> asn1::Asn1Readable<'a> for MlDsaPrivateKey<'a> {
+    fn parse(parser: &mut asn1::Parser<'a>) -> asn1::ParseResult<Self> {
+        let tlv = parser.read_element::<asn1::Tlv<'_>>()?;
+        if asn1::Implicit::<&'a [u8], 0>::can_parse(tlv.tag()) {
+            return Ok(MlDsaPrivateKey::Seed(asn1::parse(tlv.full_data(), |p| {
+                Ok(p.read_element::<asn1::Implicit<_, 0>>()
+                    .map_err(|e| {
+                        e.add_location(asn1::ParseLocation::Field("MlDsaPrivateKey::Seed"))
+                    })?
+                    .into_inner())
+            })?));
+        }
+        Err(asn1::ParseError::new(asn1::ParseErrorKind::UnexpectedTag {
+            actual: tlv.tag(),
+        }))
+    }
+    fn can_parse(tag: asn1::Tag) -> bool {
+        if asn1::Implicit::<&'a [u8], 0>::can_parse(tag) {
+            return true;
+        }
+        false
+    }
+}
+
+#[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+impl<'a> asn1::Asn1Writable for MlDsaPrivateKey<'a> {
+    type Error = asn1::WriteError;
+    fn write(&self, w: &mut asn1::Writer<'_>) -> asn1::WriteResult {
+        match self {
+            MlDsaPrivateKey::Seed(value) => {
+                w.write_element(&asn1::Implicit::<_, 0>::new(value))?;
+            }
+        }
+        Ok(())
+    }
+    fn encoded_length(&self) -> Option<usize> {
+        match self {
+            MlDsaPrivateKey::Seed(value) => {
+                asn1::Asn1Writable::encoded_length(&asn1::Implicit::<_, 0>::new(value))
+            }
+        }
+    }
+}
+
+#[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+impl<'a> asn1::Asn1Writable for &MlDsaPrivateKey<'a> {
+    type Error = asn1::WriteError;
+    fn write(&self, w: &mut asn1::Writer<'_>) -> asn1::WriteResult {
+        (*self).write(w)
+    }
+    fn encoded_length(&self) -> Option<usize> {
+        (*self).encoded_length()
+    }
 }
 
 pub fn parse_private_key(
