@@ -80,10 +80,10 @@ pub fn verify(
     public_key: &[u8],
     data: &[u8],
     context: &[u8],
-) -> OpenSSLResult<()> {
+) -> OpenSSLResult<bool> {
     // SAFETY: All pointers and lengths are valid. public_key is validated by caller.
-    unsafe {
-        let rc = SLHDSA_SHAKE_256F_verify(
+    let r = unsafe {
+        SLHDSA_SHAKE_256F_verify(
             signature.as_ptr(),
             signature.len(),
             public_key.as_ptr(),
@@ -91,8 +91,14 @@ pub fn verify(
             data.len(),
             context.as_ptr(),
             context.len(),
-        );
-        cvt(rc)?;
+        )
+    };
+
+    if r != 1 {
+        // Clear any errors from the OpenSSL error stack to prevent
+        // leaking errors into subsequent operations.
+        let _ = openssl::error::ErrorStack::get();
     }
-    Ok(())
+
+    Ok(r == 1)
 }

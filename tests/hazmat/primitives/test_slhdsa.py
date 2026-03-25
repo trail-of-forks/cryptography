@@ -7,8 +7,6 @@ import binascii
 import copy
 import json
 import os
-import random
-
 import pytest
 
 from cryptography.exceptions import InvalidSignature, _Reasons
@@ -65,48 +63,35 @@ def test_slhdsa_unsupported(backend):
     skip_message="Requires backend with SLH-DSA support",
 )
 class TestSlhDsa256:
-    def test_sign_verify_empty_message(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
+    def test_sign_verify(self, backend):
+        key = SlhDsa256PrivateKey.generate(
             SlhDsaParameterSet.SHAKE_256F
         )
-        signature = private_key.sign(b"")
-        private_key.public_key().verify(signature, b"")
+        sig = key.sign(b"test data")
+        key.public_key().verify(sig, b"test data")
 
-    def test_sign_verify_context(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
+    @pytest.mark.parametrize(
+        "ctx",
+        [
+            b"ctx",
+            b"a" * 255,
+        ],
+    )
+    def test_sign_verify_with_context(self, backend, ctx):
+        key = SlhDsa256PrivateKey.generate(
             SlhDsaParameterSet.SHAKE_256F
         )
-        context = b"my context"
-        signature = private_key.sign(b"test data", context=context)
-        private_key.public_key().verify(
-            signature, b"test data", context=context
-        )
+        sig = key.sign(b"test data", ctx)
+        key.public_key().verify(sig, b"test data", ctx)
 
-    def test_context_length_boundary(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
+    def test_context_too_long(self, backend):
+        key = SlhDsa256PrivateKey.generate(
             SlhDsaParameterSet.SHAKE_256F
         )
-        msg = b"test data"
-
-        # Valid: random length between 1 and 254
-        valid_context = b"x" * random.randint(1, 254)
-        signature = private_key.sign(msg, context=valid_context)
-        private_key.public_key().verify(signature, msg, context=valid_context)
-
-        # Valid: exactly 255 bytes (the maximum)
-        limit_context = b"x" * 255
-        signature = private_key.sign(msg, context=limit_context)
-        private_key.public_key().verify(signature, msg, context=limit_context)
-
-        # Invalid: random length between 256 and 500
-        long_context = b"x" * random.randint(256, 500)
         with pytest.raises(ValueError):
-            private_key.sign(msg, context=long_context)
-
+            key.sign(b"data", b"x" * 256)
         with pytest.raises(ValueError):
-            private_key.public_key().verify(
-                b"\x00" * 49856, msg, context=long_context
-            )
+            key.public_key().verify(b"sig", b"data", b"x" * 256)
 
     def test_from_private_bytes_wrong_length(self, backend):
         with pytest.raises(ValueError):

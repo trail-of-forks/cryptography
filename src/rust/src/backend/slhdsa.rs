@@ -39,15 +39,15 @@ pub(crate) struct SlhDsa256PublicKey {
 }
 
 #[pyo3::pyfunction]
-fn generate_key(parameter_set: SlhDsaParameterSet) -> SlhDsa256PrivateKey {
+fn generate_key(parameter_set: SlhDsaParameterSet) -> CryptographyResult<SlhDsa256PrivateKey> {
     match parameter_set {
         SlhDsaParameterSet::Shake256f => {
             let (public_key, private_key) = cryptography_openssl::slhdsa::generate_key();
-            SlhDsa256PrivateKey {
+            Ok(SlhDsa256PrivateKey {
                 parameter_set,
                 private_key,
                 public_key,
-            }
+            })
         }
     }
 }
@@ -203,13 +203,21 @@ impl SlhDsa256PublicKey {
                 pyo3::exceptions::PyValueError::new_err("context must be at most 255 bytes long"),
             ));
         }
-        cryptography_openssl::slhdsa::verify(
+        let valid = cryptography_openssl::slhdsa::verify(
             signature.as_bytes(),
             &self.public_key,
             data.as_bytes(),
             ctx_bytes,
         )
-        .map_err(|_| CryptographyError::from(exceptions::InvalidSignature::new_err(())))
+        .unwrap_or(false);
+
+        if !valid {
+            return Err(CryptographyError::from(
+                exceptions::InvalidSignature::new_err(()),
+            ));
+        }
+
+        Ok(())
     }
 
     fn public_bytes_raw<'p>(&self, py: pyo3::Python<'p>) -> pyo3::Bound<'p, pyo3::types::PyBytes> {
