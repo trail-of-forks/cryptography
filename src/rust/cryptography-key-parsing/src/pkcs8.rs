@@ -24,7 +24,7 @@ pub struct PrivateKeyInfo<'a> {
 
 // RFC 9881 Section 6.5
 #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-enum MlDsaPrivateKey<'a> {
+pub enum MlDsaPrivateKey<'a> {
     Seed(&'a [u8]),
 }
 
