@@ -58,6 +58,9 @@ pub enum AlgorithmParameters<'a> {
     #[defined_by(oid::X448_OID)]
     X448,
 
+    #[defined_by(oid::SLH_DSA_SHAKE_256F_OID)]
+    SlhDsaShake256f,
+
     // These encodings are only used in SPKI AlgorithmIdentifiers.
     #[defined_by(oid::EC_OID)]
     Ec(EcParameters<'a>),

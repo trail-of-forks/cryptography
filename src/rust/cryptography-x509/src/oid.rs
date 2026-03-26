@@ -109,6 +109,9 @@ pub const X448_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 101, 111);
 pub const ED25519_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 101, 112);
 pub const ED448_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 101, 113);
 
+pub const SLH_DSA_SHAKE_256F_OID: asn1::ObjectIdentifier =
+    asn1::oid!(2, 16, 840, 1, 101, 3, 4, 3, 25);
+
 // Hashes
 pub const SHA1_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 14, 3, 2, 26);
 pub const SHA224_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 2, 4);

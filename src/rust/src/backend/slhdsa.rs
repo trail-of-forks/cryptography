@@ -2,13 +2,44 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use pyo3::types::PyAnyMethods;
-
 use crate::buf::CffiBuf;
 use crate::error::{CryptographyError, CryptographyResult};
 use crate::exceptions;
+use cryptography_x509::common::{AlgorithmIdentifier, AlgorithmParameters, SubjectPublicKeyInfo};
 
 const MAX_CONTEXT_BYTES: usize = 255;
+
+pub(crate) fn private_key_from_raw_bytes(
+    data: &[u8],
+) -> CryptographyResult<SlhDsaShake256fPrivateKey> {
+    if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PRIVATE_KEY_BYTES {
+        return Err(CryptographyError::from(
+            pyo3::exceptions::PyValueError::new_err(
+                "An SLH-DSA-SHAKE-256f private key is 128 bytes long",
+            ),
+        ));
+    }
+    let public_key = cryptography_openssl::slhdsa::public_from_private(data);
+    Ok(SlhDsaShake256fPrivateKey {
+        private_key: data.to_vec(),
+        public_key,
+    })
+}
+
+pub(crate) fn public_key_from_raw_bytes(
+    data: &[u8],
+) -> CryptographyResult<SlhDsaShake256fPublicKey> {
+    if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PUBLIC_KEY_BYTES {
+        return Err(CryptographyError::from(
+            pyo3::exceptions::PyValueError::new_err(
+                "An SLH-DSA-SHAKE-256f public key is 64 bytes long",
+            ),
+        ));
+    }
+    Ok(SlhDsaShake256fPublicKey {
+        public_key: data.to_vec(),
+    })
+}
 
 #[pyo3::pyclass(frozen, module = "cryptography.hazmat.bindings._rust.openssl.slhdsa")]
 pub(crate) struct SlhDsaShake256fPrivateKey {
@@ -32,29 +63,12 @@ fn generate_key() -> CryptographyResult<SlhDsaShake256fPrivateKey> {
 
 #[pyo3::pyfunction]
 fn from_private_bytes(data: CffiBuf<'_>) -> pyo3::PyResult<SlhDsaShake256fPrivateKey> {
-    let data = data.as_bytes();
-    if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PRIVATE_KEY_BYTES {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "An SLH-DSA-SHAKE-256f private key is 128 bytes long",
-        ));
-    }
-    let public_key = cryptography_openssl::slhdsa::public_from_private(data);
-    Ok(SlhDsaShake256fPrivateKey {
-        private_key: data.to_vec(),
-        public_key,
-    })
+    Ok(private_key_from_raw_bytes(data.as_bytes())?)
 }
 
 #[pyo3::pyfunction]
 fn from_public_bytes(data: &[u8]) -> pyo3::PyResult<SlhDsaShake256fPublicKey> {
-    if data.len() != cryptography_openssl::slhdsa::SHAKE_256F_PUBLIC_KEY_BYTES {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "An SLH-DSA-SHAKE-256f public key is 64 bytes long",
-        ));
-    }
-    Ok(SlhDsaShake256fPublicKey {
-        public_key: data.to_vec(),
-    })
+    Ok(public_key_from_raw_bytes(data)?)
 }
 
 #[pyo3::pymethods]
@@ -94,33 +108,44 @@ impl SlhDsaShake256fPrivateKey {
         format: crate::serialization::PrivateFormat,
         encryption_algorithm: &pyo3::Bound<'p, pyo3::PyAny>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-        if !encryption_algorithm.is_instance(&crate::types::NO_ENCRYPTION.get(py)?)? {
-            if encryption_algorithm
-                .is_instance(&crate::types::KEY_SERIALIZATION_ENCRYPTION.get(py)?)?
-            {
-                return Err(CryptographyError::from(
-                    pyo3::exceptions::PyValueError::new_err(
-                        "SLH-DSA keys do not support PKCS#8/PEM serialization yet",
-                    ),
-                ));
+        let password = match crate::backend::utils::validate_private_key_encryption(
+            py,
+            encoding,
+            format,
+            encryption_algorithm,
+            true,
+        )? {
+            crate::backend::utils::PrivateKeyPassword::Raw => {
+                return Ok(pyo3::types::PyBytes::new(py, &self.private_key));
             }
+            crate::backend::utils::PrivateKeyPassword::Password(p) => p,
+        };
+
+        if format != crate::serialization::PrivateFormat::PKCS8 {
             return Err(CryptographyError::from(
-                pyo3::exceptions::PyTypeError::new_err(
-                    "encryption_algorithm must be an instance of NoEncryption",
+                pyo3::exceptions::PyValueError::new_err(
+                    "SLH-DSA private keys only support Raw or PKCS8 format",
                 ),
             ));
         }
 
-        match (encoding, format) {
-            (crate::serialization::Encoding::Raw, crate::serialization::PrivateFormat::Raw) => {
-                Ok(pyo3::types::PyBytes::new(py, &self.private_key))
-            }
-            _ => Err(CryptographyError::from(
-                pyo3::exceptions::PyValueError::new_err(
-                    "SLH-DSA private keys only support Raw encoding with Raw format",
-                ),
-            )),
-        }
+        let private_key_der = asn1::write_single(&self.private_key.as_slice()).map_err(|e| {
+            CryptographyError::from(pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        })?;
+        let pki = cryptography_key_parsing::pkcs8::PrivateKeyInfo {
+            version: 0,
+            algorithm: AlgorithmIdentifier {
+                oid: asn1::DefinedByMarker::marker(),
+                params: AlgorithmParameters::SlhDsaShake256f,
+            },
+            private_key: &private_key_der,
+            attributes: None,
+        };
+        let pkcs8_der = asn1::write_single(&pki).map_err(|e| {
+            CryptographyError::from(pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        })?;
+
+        crate::backend::utils::encode_pkcs8_der(py, pkcs8_der, &password, encoding)
     }
 
     fn __copy__(slf: pyo3::PyRef<'_, Self>) -> pyo3::PyRef<'_, Self> {
@@ -177,16 +202,41 @@ impl SlhDsaShake256fPublicKey {
         encoding: crate::serialization::Encoding,
         format: crate::serialization::PublicFormat,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-        match (encoding, format) {
-            (crate::serialization::Encoding::Raw, crate::serialization::PublicFormat::Raw) => {
-                Ok(pyo3::types::PyBytes::new(py, &self.public_key))
+        if encoding == crate::serialization::Encoding::Raw
+            || format == crate::serialization::PublicFormat::Raw
+        {
+            if encoding != crate::serialization::Encoding::Raw
+                || format != crate::serialization::PublicFormat::Raw
+            {
+                return Err(CryptographyError::from(
+                    pyo3::exceptions::PyValueError::new_err(
+                        "When using Raw both encoding and format must be Raw",
+                    ),
+                ));
             }
-            _ => Err(CryptographyError::from(
-                pyo3::exceptions::PyValueError::new_err(
-                    "SLH-DSA public keys only support Raw encoding with Raw format",
-                ),
-            )),
+            return Ok(pyo3::types::PyBytes::new(py, &self.public_key));
         }
+
+        if format != crate::serialization::PublicFormat::SubjectPublicKeyInfo {
+            return Err(CryptographyError::from(
+                pyo3::exceptions::PyValueError::new_err(
+                    "SLH-DSA public keys only support Raw or SubjectPublicKeyInfo format",
+                ),
+            ));
+        }
+
+        let spki = SubjectPublicKeyInfo {
+            algorithm: AlgorithmIdentifier {
+                oid: asn1::DefinedByMarker::marker(),
+                params: AlgorithmParameters::SlhDsaShake256f,
+            },
+            subject_public_key: asn1::BitString::new(&self.public_key, 0).unwrap(),
+        };
+        let der_bytes = asn1::write_single(&spki).map_err(|e| {
+            CryptographyError::from(pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        })?;
+
+        crate::asn1::encode_der_data(py, "PUBLIC KEY".to_string(), der_bytes, encoding)
     }
 
     fn __eq__(&self, other: pyo3::PyRef<'_, Self>) -> bool {

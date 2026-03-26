@@ -26,6 +26,10 @@ pub fn parse_public_key(data: &[u8]) -> KeyParsingResult<ParsedPublicKey> {
             let pkey = openssl::pkey::PKey::from_ec_key(ec_key)?;
             Ok(ParsedPublicKey::Pkey(pkey))
         }
+        #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+        AlgorithmParameters::SlhDsaShake256f => Ok(ParsedPublicKey::SlhDsaShake256f(
+            k.subject_public_key.as_bytes().to_vec(),
+        )),
         AlgorithmParameters::Ed25519 => Ok(ParsedPublicKey::Pkey(
             openssl::pkey::PKey::public_key_from_raw_bytes(
                 k.subject_public_key.as_bytes(),

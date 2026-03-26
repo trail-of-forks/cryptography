@@ -188,6 +188,12 @@ fn private_key_from_parsed<'p>(
         cryptography_key_parsing::ParsedPrivateKey::Pkey(pkey) => {
             private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation)
         }
+        #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+        cryptography_key_parsing::ParsedPrivateKey::SlhDsaShake256f(data) => {
+            Ok(crate::backend::slhdsa::private_key_from_raw_bytes(&data)?
+                .into_pyobject(py)?
+                .into_any())
+        }
     }
 }
 
@@ -198,6 +204,12 @@ fn public_key_from_parsed<'p>(
     match parsed {
         cryptography_key_parsing::ParsedPublicKey::Pkey(pkey) => {
             public_key_from_pkey(py, &pkey, pkey.id())
+        }
+        #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+        cryptography_key_parsing::ParsedPublicKey::SlhDsaShake256f(data) => {
+            Ok(crate::backend::slhdsa::public_key_from_raw_bytes(&data)?
+                .into_pyobject(py)?
+                .into_any())
         }
     }
 }

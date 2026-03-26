@@ -38,6 +38,114 @@ pub(crate) fn bn_to_py_int<'p>(
     )?)
 }
 
+pub(crate) enum PrivateKeyPassword {
+    /// Raw format requested — caller should return raw bytes directly.
+    Raw,
+    /// Password extracted (empty for NoEncryption).
+    Password(pyo3::pybacked::PyBackedBytes),
+}
+
+/// Validate encoding/format/encryption_algorithm for private key
+/// serialization. Returns `Raw` if raw format was requested (after
+/// validating constraints), or `Password` with the extracted password.
+pub(crate) fn validate_private_key_encryption(
+    py: pyo3::Python<'_>,
+    encoding: Encoding,
+    format: PrivateFormat,
+    encryption_algorithm: &pyo3::Bound<'_, pyo3::PyAny>,
+    raw_allowed: bool,
+) -> CryptographyResult<PrivateKeyPassword> {
+    if raw_allowed && (encoding == Encoding::Raw || format == PrivateFormat::Raw) {
+        if !encryption_algorithm.is_instance(&types::KEY_SERIALIZATION_ENCRYPTION.get(py)?)? {
+            return Err(CryptographyError::from(
+                pyo3::exceptions::PyTypeError::new_err(
+                    "Encryption algorithm must be a KeySerializationEncryption instance",
+                ),
+            ));
+        }
+        if encoding != Encoding::Raw
+            || format != PrivateFormat::Raw
+            || !encryption_algorithm.is_instance(&types::NO_ENCRYPTION.get(py)?)?
+        {
+            return Err(CryptographyError::from(
+                pyo3::exceptions::PyValueError::new_err(
+                    "When using Raw both encoding and format must be Raw and encryption_algorithm must be NoEncryption()",
+                ),
+            ));
+        }
+        return Ok(PrivateKeyPassword::Raw);
+    }
+
+    extract_password_from_encryption_algorithm(py, encryption_algorithm, format)
+        .map(PrivateKeyPassword::Password)
+}
+
+/// Validate an encryption_algorithm and extract its password.
+/// Returns empty bytes for NoEncryption, or the password for
+/// BestAvailableEncryption / EncryptionBuilder (when format matches).
+fn extract_password_from_encryption_algorithm(
+    py: pyo3::Python<'_>,
+    encryption_algorithm: &pyo3::Bound<'_, pyo3::PyAny>,
+    format: PrivateFormat,
+) -> CryptographyResult<pyo3::pybacked::PyBackedBytes> {
+    if !encryption_algorithm.is_instance(&types::KEY_SERIALIZATION_ENCRYPTION.get(py)?)? {
+        return Err(CryptographyError::from(
+            pyo3::exceptions::PyTypeError::new_err(
+                "Encryption algorithm must be a KeySerializationEncryption instance",
+            ),
+        ));
+    }
+
+    if encryption_algorithm.is_instance(&types::NO_ENCRYPTION.get(py)?)? {
+        return Ok(pyo3::pybacked::PyBackedBytes::from(
+            pyo3::types::PyBytes::new(py, b""),
+        ));
+    }
+
+    if encryption_algorithm.is_instance(&types::BEST_AVAILABLE_ENCRYPTION.get(py)?)?
+        || (encryption_algorithm.is_instance(&types::ENCRYPTION_BUILDER.get(py)?)?
+            && encryption_algorithm
+                .getattr(pyo3::intern!(py, "_format"))?
+                .extract::<PrivateFormat>()?
+                == format)
+    {
+        let password = encryption_algorithm
+            .getattr(pyo3::intern!(py, "password"))?
+            .extract::<pyo3::pybacked::PyBackedBytes>()?;
+        if password.len() > 1023 {
+            return Err(CryptographyError::from(
+                pyo3::exceptions::PyValueError::new_err(
+                    "Passwords longer than 1023 bytes are not supported by this backend",
+                ),
+            ));
+        }
+        return Ok(password);
+    }
+
+    Err(CryptographyError::from(
+        pyo3::exceptions::PyValueError::new_err("Unsupported encryption type"),
+    ))
+}
+
+/// Encode PKCS8 DER bytes with optional encryption, then encode to the
+/// requested format (DER or PEM).
+pub(crate) fn encode_pkcs8_der<'p>(
+    py: pyo3::Python<'p>,
+    pkcs8_der: Vec<u8>,
+    password: &[u8],
+    encoding: Encoding,
+) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
+    let (tag, der_bytes) = if password.is_empty() {
+        ("PRIVATE KEY", pkcs8_der)
+    } else {
+        (
+            "ENCRYPTED PRIVATE KEY",
+            cryptography_key_parsing::pkcs8::encrypt_private_key_der(&pkcs8_der, password)?,
+        )
+    };
+    crate::asn1::encode_der_data(py, tag.to_string(), der_bytes, encoding)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn pkey_private_bytes<'p>(
     py: pyo3::Python<'p>,
@@ -49,69 +157,24 @@ pub(crate) fn pkey_private_bytes<'p>(
     openssh_allowed: bool,
     raw_allowed: bool,
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-    if !encryption_algorithm.is_instance(&types::KEY_SERIALIZATION_ENCRYPTION.get(py)?)? {
-        return Err(CryptographyError::from(
-            pyo3::exceptions::PyTypeError::new_err(
-                "Encryption algorithm must be a KeySerializationEncryption instance",
-            ),
-        ));
-    }
-
-    if raw_allowed && (encoding == Encoding::Raw || format == PrivateFormat::Raw) {
-        if encoding != Encoding::Raw
-            || format != PrivateFormat::Raw
-            || !encryption_algorithm.is_instance(&types::NO_ENCRYPTION.get(py)?)?
-        {
-            return Err(CryptographyError::from(pyo3::exceptions::PyValueError::new_err(
-                    "When using Raw both encoding and format must be Raw and encryption_algorithm must be NoEncryption()"
-                )));
+    let password = match validate_private_key_encryption(
+        py,
+        encoding,
+        format,
+        encryption_algorithm,
+        raw_allowed,
+    )? {
+        PrivateKeyPassword::Raw => {
+            let raw_bytes = pkey.raw_private_key()?;
+            return Ok(pyo3::types::PyBytes::new(py, &raw_bytes));
         }
-        let raw_bytes = pkey.raw_private_key()?;
-        return Ok(pyo3::types::PyBytes::new(py, &raw_bytes));
-    }
-
-    let py_password;
-    let password = if encryption_algorithm.is_instance(&types::NO_ENCRYPTION.get(py)?)? {
-        b"" as &[u8]
-    } else if encryption_algorithm.is_instance(&types::BEST_AVAILABLE_ENCRYPTION.get(py)?)?
-        || (encryption_algorithm.is_instance(&types::ENCRYPTION_BUILDER.get(py)?)?
-            && encryption_algorithm
-                .getattr(pyo3::intern!(py, "_format"))?
-                .extract::<PrivateFormat>()?
-                == format)
-    {
-        py_password = encryption_algorithm
-            .getattr(pyo3::intern!(py, "password"))?
-            .extract::<pyo3::pybacked::PyBackedBytes>()?;
-        &py_password
-    } else {
-        return Err(CryptographyError::from(
-            pyo3::exceptions::PyValueError::new_err("Unsupported encryption type"),
-        ));
+        PrivateKeyPassword::Password(p) => p,
     };
-
-    if password.len() > 1023 {
-        return Err(CryptographyError::from(
-            pyo3::exceptions::PyValueError::new_err(
-                "Passwords longer than 1023 bytes are not supported by this backend",
-            ),
-        ));
-    }
+    let password = &*password;
 
     if format == PrivateFormat::PKCS8 {
-        let (tag, der_bytes) = if password.is_empty() {
-            (
-                "PRIVATE KEY",
-                cryptography_key_parsing::pkcs8::serialize_private_key(pkey)?,
-            )
-        } else {
-            (
-                "ENCRYPTED PRIVATE KEY",
-                cryptography_key_parsing::pkcs8::serialize_encrypted_private_key(pkey, password)?,
-            )
-        };
-
-        return crate::asn1::encode_der_data(py, tag.to_string(), der_bytes, encoding);
+        let pkcs8_der = cryptography_key_parsing::pkcs8::serialize_private_key(pkey)?;
+        return encode_pkcs8_der(py, pkcs8_der, password, encoding);
     }
 
     if format == PrivateFormat::TraditionalOpenSSL {

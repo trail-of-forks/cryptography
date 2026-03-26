@@ -54,10 +54,14 @@ pub type PrivateKeyParser = fn(&[u8]) -> KeyParsingResult<ParsedPrivateKey>;
 
 pub enum ParsedPrivateKey {
     Pkey(openssl::pkey::PKey<openssl::pkey::Private>),
+    #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+    SlhDsaShake256f(Vec<u8>),
 }
 
 pub enum ParsedPublicKey {
     Pkey(openssl::pkey::PKey<openssl::pkey::Public>),
+    #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+    SlhDsaShake256f(Vec<u8>),
 }
 
 pub enum KeySerializationError {

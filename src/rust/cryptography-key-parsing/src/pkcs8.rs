@@ -88,6 +88,11 @@ pub fn parse_private_key(data: &[u8]) -> KeyParsingResult<ParsedPrivateKey> {
             )?;
             Ok(ParsedPrivateKey::Pkey(pkey))
         }
+        #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+        AlgorithmParameters::SlhDsaShake256f => {
+            let key_bytes: &[u8] = asn1::parse_single(k.private_key)?;
+            Ok(ParsedPrivateKey::SlhDsaShake256f(key_bytes.to_vec()))
+        }
         AlgorithmParameters::Ed25519 => {
             let key_bytes = asn1::parse_single(k.private_key)?;
             let pkey = openssl::pkey::PKey::private_key_from_raw_bytes(
@@ -464,12 +469,10 @@ pub fn serialize_private_key(
 
 const KDF_ITERATION_COUNT: u64 = 2048;
 
-pub fn serialize_encrypted_private_key(
-    pkey: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
+pub fn encrypt_private_key_der(
+    plaintext_der: &[u8],
     password: &[u8],
 ) -> crate::KeySerializationResult<Vec<u8>> {
-    let plaintext_der = serialize_private_key(pkey)?;
-
     let e = pbe::EncryptionAlgorithm::PBESv2SHA256AndAES256CBC;
 
     let mut salt = [0u8; 16];
@@ -477,7 +480,7 @@ pub fn serialize_encrypted_private_key(
     cryptography_openssl::rand::rand_bytes(&mut salt)?;
     cryptography_openssl::rand::rand_bytes(&mut iv)?;
 
-    let encrypted_data = e.encrypt(password, KDF_ITERATION_COUNT, &salt, &iv, &plaintext_der)?;
+    let encrypted_data = e.encrypt(password, KDF_ITERATION_COUNT, &salt, &iv, plaintext_der)?;
     let encryption_alg = e.algorithm_identifier(KDF_ITERATION_COUNT, &salt, &iv);
 
     let epki = cryptography_x509::pkcs8::EncryptedPrivateKeyInfo {
@@ -486,6 +489,14 @@ pub fn serialize_encrypted_private_key(
     };
 
     Ok(asn1::write_single(&epki)?)
+}
+
+pub fn serialize_encrypted_private_key(
+    pkey: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
+    password: &[u8],
+) -> crate::KeySerializationResult<Vec<u8>> {
+    let plaintext_der = serialize_private_key(pkey)?;
+    encrypt_private_key_der(&plaintext_der, password)
 }
 
 #[cfg(test)]
