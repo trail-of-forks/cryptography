@@ -11,17 +11,13 @@ from cryptography.hazmat.bindings._rust import openssl as rust_openssl
 from cryptography.hazmat.primitives import _serialization
 from cryptography.utils import Buffer
 
-if hasattr(rust_openssl, "slhdsa"):
-    SlhDsaParameterSet = rust_openssl.slhdsa.SlhDsaParameterSet
 
-
-class SlhDsa256PublicKey(metaclass=abc.ABCMeta):
+class SlhDsaShake256fPublicKey(metaclass=abc.ABCMeta):
     @classmethod
     def from_public_bytes(
         cls,
-        parameter_set: SlhDsaParameterSet,
         data: bytes,
-    ) -> SlhDsa256PublicKey:
+    ) -> SlhDsaShake256fPublicKey:
         from cryptography.hazmat.backends.openssl.backend import backend
 
         if not backend.slhdsa_supported():
@@ -30,14 +26,7 @@ class SlhDsa256PublicKey(metaclass=abc.ABCMeta):
                 _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM,
             )
 
-        return rust_openssl.slhdsa.from_public_bytes(parameter_set, data)
-
-    @property
-    @abc.abstractmethod
-    def parameter_set(self) -> SlhDsaParameterSet:
-        """
-        The parameter set used by this key.
-        """
+        return rust_openssl.slhdsa.from_public_bytes(data)
 
     @abc.abstractmethod
     def verify(
@@ -73,27 +62,27 @@ class SlhDsa256PublicKey(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def __copy__(self) -> SlhDsa256PublicKey:
+    def __copy__(self) -> SlhDsaShake256fPublicKey:
         """
         Returns a copy.
         """
 
     @abc.abstractmethod
-    def __deepcopy__(self, memo: dict) -> SlhDsa256PublicKey:
+    def __deepcopy__(self, memo: dict) -> SlhDsaShake256fPublicKey:
         """
         Returns a deep copy.
         """
 
 
 if hasattr(rust_openssl, "slhdsa"):
-    SlhDsa256PublicKey.register(rust_openssl.slhdsa.SlhDsa256PublicKey)
+    SlhDsaShake256fPublicKey.register(
+        rust_openssl.slhdsa.SlhDsaShake256fPublicKey
+    )
 
 
-class SlhDsa256PrivateKey(metaclass=abc.ABCMeta):
+class SlhDsaShake256fPrivateKey(metaclass=abc.ABCMeta):
     @classmethod
-    def generate(
-        cls, parameter_set: SlhDsaParameterSet
-    ) -> SlhDsa256PrivateKey:
+    def generate(cls) -> SlhDsaShake256fPrivateKey:
         from cryptography.hazmat.backends.openssl.backend import backend
 
         if not backend.slhdsa_supported():
@@ -102,14 +91,13 @@ class SlhDsa256PrivateKey(metaclass=abc.ABCMeta):
                 _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM,
             )
 
-        return rust_openssl.slhdsa.generate_key(parameter_set)
+        return rust_openssl.slhdsa.generate_key()
 
     @classmethod
     def from_private_bytes(
         cls,
-        parameter_set: SlhDsaParameterSet,
         data: Buffer,
-    ) -> SlhDsa256PrivateKey:
+    ) -> SlhDsaShake256fPrivateKey:
         from cryptography.hazmat.backends.openssl.backend import backend
 
         if not backend.slhdsa_supported():
@@ -118,19 +106,12 @@ class SlhDsa256PrivateKey(metaclass=abc.ABCMeta):
                 _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM,
             )
 
-        return rust_openssl.slhdsa.from_private_bytes(parameter_set, data)
-
-    @property
-    @abc.abstractmethod
-    def parameter_set(self) -> SlhDsaParameterSet:
-        """
-        The parameter set used by this key.
-        """
+        return rust_openssl.slhdsa.from_private_bytes(data)
 
     @abc.abstractmethod
-    def public_key(self) -> SlhDsa256PublicKey:
+    def public_key(self) -> SlhDsaShake256fPublicKey:
         """
-        The SlhDsa256PublicKey derived from the private key.
+        The SlhDsaShake256fPublicKey derived from the private key.
         """
 
     @abc.abstractmethod
@@ -161,17 +142,19 @@ class SlhDsa256PrivateKey(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def __copy__(self) -> SlhDsa256PrivateKey:
+    def __copy__(self) -> SlhDsaShake256fPrivateKey:
         """
         Returns a copy.
         """
 
     @abc.abstractmethod
-    def __deepcopy__(self, memo: dict) -> SlhDsa256PrivateKey:
+    def __deepcopy__(self, memo: dict) -> SlhDsaShake256fPrivateKey:
         """
         Returns a deep copy.
         """
 
 
 if hasattr(rust_openssl, "slhdsa"):
-    SlhDsa256PrivateKey.register(rust_openssl.slhdsa.SlhDsa256PrivateKey)
+    SlhDsaShake256fPrivateKey.register(
+        rust_openssl.slhdsa.SlhDsaShake256fPrivateKey
+    )

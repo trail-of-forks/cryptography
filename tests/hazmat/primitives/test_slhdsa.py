@@ -13,16 +13,9 @@ import pytest
 from cryptography.exceptions import InvalidSignature, _Reasons
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.slhdsa import (
-    SlhDsa256PrivateKey,
-    SlhDsa256PublicKey,
+    SlhDsaShake256fPrivateKey,
+    SlhDsaShake256fPublicKey,
 )
-
-try:
-    from cryptography.hazmat.primitives.asymmetric.slhdsa import (
-        SlhDsaParameterSet,
-    )
-except ImportError:
-    pass
 
 from ...doubles import DummyKeySerializationEncryption
 from ...utils import load_vectors_from_file, raises_unsupported_algorithm
@@ -33,39 +26,33 @@ from ...utils import load_vectors_from_file, raises_unsupported_algorithm
     skip_message="Requires backend without SLH-DSA support",
 )
 def test_slhdsa_unsupported(backend):
-    # On non-BoringSSL backends, SlhDsaParameterSet doesn't exist,
-    # but UnsupportedAlgorithm is raised before parameter_set is used.
-    dummy_ps = None
-
     with raises_unsupported_algorithm(
         _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
     ):
-        SlhDsa256PublicKey.from_public_bytes(
-            dummy_ps,  # type: ignore[arg-type]
+        SlhDsaShake256fPublicKey.from_public_bytes(
             b"0" * 64,
         )
 
     with raises_unsupported_algorithm(
         _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
     ):
-        SlhDsa256PrivateKey.from_private_bytes(
-            dummy_ps,  # type: ignore[arg-type]
+        SlhDsaShake256fPrivateKey.from_private_bytes(
             b"0" * 128,
         )
 
     with raises_unsupported_algorithm(
         _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
     ):
-        SlhDsa256PrivateKey.generate(dummy_ps)  # type: ignore[arg-type]
+        SlhDsaShake256fPrivateKey.generate()
 
 
 @pytest.mark.supported(
     only_if=lambda backend: backend.slhdsa_supported(),
     skip_message="Requires backend with SLH-DSA support",
 )
-class TestSlhDsa256:
+class TestSlhDsaShake256f:
     def test_sign_verify(self, backend):
-        key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
+        key = SlhDsaShake256fPrivateKey.generate()
         sig = key.sign(b"test data")
         key.public_key().verify(sig, b"test data")
 
@@ -77,12 +64,12 @@ class TestSlhDsa256:
         ],
     )
     def test_sign_verify_with_context(self, backend, ctx):
-        key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
+        key = SlhDsaShake256fPrivateKey.generate()
         sig = key.sign(b"test data", ctx)
         key.public_key().verify(sig, b"test data", ctx)
 
     def test_context_too_long(self, backend):
-        key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
+        key = SlhDsaShake256fPrivateKey.generate()
         with pytest.raises(ValueError):
             key.sign(b"data", b"x" * 256)
         with pytest.raises(ValueError):
@@ -90,51 +77,33 @@ class TestSlhDsa256:
 
     def test_from_private_bytes_wrong_length(self, backend):
         with pytest.raises(ValueError):
-            SlhDsa256PrivateKey.from_private_bytes(
-                SlhDsaParameterSet.SHAKE_256F, b"a" * 127
-            )
+            SlhDsaShake256fPrivateKey.from_private_bytes(b"a" * 127)
         with pytest.raises(ValueError):
-            SlhDsa256PrivateKey.from_private_bytes(
-                SlhDsaParameterSet.SHAKE_256F, b"a" * 129
-            )
+            SlhDsaShake256fPrivateKey.from_private_bytes(b"a" * 129)
 
     def test_from_public_bytes_wrong_length(self, backend):
         with pytest.raises(ValueError):
-            SlhDsa256PublicKey.from_public_bytes(
-                SlhDsaParameterSet.SHAKE_256F, b"a" * 63
-            )
+            SlhDsaShake256fPublicKey.from_public_bytes(b"a" * 63)
         with pytest.raises(ValueError):
-            SlhDsa256PublicKey.from_public_bytes(
-                SlhDsaParameterSet.SHAKE_256F, b"a" * 65
-            )
+            SlhDsaShake256fPublicKey.from_public_bytes(b"a" * 65)
 
     def test_private_bytes_raw_round_trip(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        private_key = SlhDsaShake256fPrivateKey.generate()
         raw = private_key.private_bytes_raw()
         assert len(raw) == 128
-        loaded = SlhDsa256PrivateKey.from_private_bytes(
-            SlhDsaParameterSet.SHAKE_256F, raw
-        )
+        loaded = SlhDsaShake256fPrivateKey.from_private_bytes(raw)
         assert loaded.private_bytes_raw() == raw
 
     def test_public_bytes_raw_round_trip(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        private_key = SlhDsaShake256fPrivateKey.generate()
         public_key = private_key.public_key()
         raw = public_key.public_bytes_raw()
         assert len(raw) == 64
-        loaded = SlhDsa256PublicKey.from_public_bytes(
-            SlhDsaParameterSet.SHAKE_256F, raw
-        )
+        loaded = SlhDsaShake256fPublicKey.from_public_bytes(raw)
         assert loaded.public_bytes_raw() == raw
 
     def test_private_bytes_raw_format(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        private_key = SlhDsaShake256fPrivateKey.generate()
         raw = private_key.private_bytes(
             serialization.Encoding.Raw,
             serialization.PrivateFormat.Raw,
@@ -143,9 +112,7 @@ class TestSlhDsa256:
         assert raw == private_key.private_bytes_raw()
 
     def test_public_bytes_raw_format(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        private_key = SlhDsaShake256fPrivateKey.generate()
         public_key = private_key.public_key()
         raw = public_key.public_bytes(
             serialization.Encoding.Raw,
@@ -154,9 +121,7 @@ class TestSlhDsa256:
         assert raw == public_key.public_bytes_raw()
 
     def test_invalid_private_bytes(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
+        private_key = SlhDsaShake256fPrivateKey.generate()
         with pytest.raises(TypeError):
             private_key.private_bytes(
                 serialization.Encoding.Raw,
@@ -183,9 +148,7 @@ class TestSlhDsa256:
             )
 
     def test_invalid_public_bytes(self, backend):
-        public_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        ).public_key()
+        public_key = SlhDsaShake256fPrivateKey.generate().public_key()
         with pytest.raises(ValueError):
             public_key.public_bytes(
                 serialization.Encoding.PEM,
@@ -195,32 +158,6 @@ class TestSlhDsa256:
             public_key.public_bytes(
                 serialization.Encoding.Raw,
                 serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
-
-    def test_parameter_set(self, backend):
-        private_key = SlhDsa256PrivateKey.generate(
-            SlhDsaParameterSet.SHAKE_256F
-        )
-        assert private_key.parameter_set == SlhDsaParameterSet.SHAKE_256F
-        assert (
-            private_key.public_key().parameter_set
-            == SlhDsaParameterSet.SHAKE_256F
-        )
-
-    def test_invalid_parameter_set(self, backend):
-        with pytest.raises(TypeError):
-            SlhDsa256PrivateKey.generate("not-a-parameter-set")  # type: ignore[arg-type]
-
-        with pytest.raises(TypeError):
-            SlhDsa256PrivateKey.from_private_bytes(
-                "not-a-parameter-set",  # type: ignore[arg-type]
-                b"a" * 128,
-            )
-
-        with pytest.raises(TypeError):
-            SlhDsa256PublicKey.from_public_bytes(
-                "not-a-parameter-set",  # type: ignore[arg-type]
-                b"a" * 64,
             )
 
     def test_keygen_vectors(self, backend, subtests):
@@ -236,8 +173,8 @@ class TestSlhDsa256:
                     sk = binascii.unhexlify(test["sk"])
                     pk = binascii.unhexlify(test["pk"])
 
-                    private_key = SlhDsa256PrivateKey.from_private_bytes(
-                        SlhDsaParameterSet.SHAKE_256F, sk
+                    private_key = SlhDsaShake256fPrivateKey.from_private_bytes(
+                        sk
                     )
                     assert private_key.private_bytes_raw() == sk
                     assert private_key.public_key().public_bytes_raw() == pk
@@ -257,9 +194,7 @@ class TestSlhDsa256:
                     sig = binascii.unhexlify(test["signature"])
                     ctx = binascii.unhexlify(test["context"])
 
-                    public_key = SlhDsa256PublicKey.from_public_bytes(
-                        SlhDsaParameterSet.SHAKE_256F, pk
-                    )
+                    public_key = SlhDsaShake256fPublicKey.from_public_bytes(pk)
                     context = ctx if ctx else None
 
                     if test["testPassed"]:
@@ -274,12 +209,11 @@ class TestSlhDsa256:
     skip_message="Requires backend with SLH-DSA support",
 )
 def test_public_key_equality(backend):
-    key1 = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
-    key2 = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
+    key1 = SlhDsaShake256fPrivateKey.generate()
+    key2 = SlhDsaShake256fPrivateKey.generate()
 
     pub1a = key1.public_key()
-    pub1b = SlhDsa256PublicKey.from_public_bytes(
-        SlhDsaParameterSet.SHAKE_256F,
+    pub1b = SlhDsaShake256fPublicKey.from_public_bytes(
         key1.public_key().public_bytes_raw(),
     )
     pub2 = key2.public_key()
@@ -297,9 +231,7 @@ def test_public_key_equality(backend):
     skip_message="Requires backend with SLH-DSA support",
 )
 def test_public_key_copy(backend):
-    key = SlhDsa256PrivateKey.generate(
-        SlhDsaParameterSet.SHAKE_256F
-    ).public_key()
+    key = SlhDsaShake256fPrivateKey.generate().public_key()
     key2 = copy.copy(key)
     assert key == key2
 
@@ -309,9 +241,7 @@ def test_public_key_copy(backend):
     skip_message="Requires backend with SLH-DSA support",
 )
 def test_public_key_deepcopy(backend):
-    key = SlhDsa256PrivateKey.generate(
-        SlhDsaParameterSet.SHAKE_256F
-    ).public_key()
+    key = SlhDsaShake256fPrivateKey.generate().public_key()
     key2 = copy.deepcopy(key)
     assert key == key2
 
@@ -321,7 +251,7 @@ def test_public_key_deepcopy(backend):
     skip_message="Requires backend with SLH-DSA support",
 )
 def test_private_key_copy(backend):
-    key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
+    key = SlhDsaShake256fPrivateKey.generate()
     key2 = copy.copy(key)
     assert key.private_bytes_raw() == key2.private_bytes_raw()
 
@@ -331,6 +261,6 @@ def test_private_key_copy(backend):
     skip_message="Requires backend with SLH-DSA support",
 )
 def test_private_key_deepcopy(backend):
-    key = SlhDsa256PrivateKey.generate(SlhDsaParameterSet.SHAKE_256F)
+    key = SlhDsaShake256fPrivateKey.generate()
     key2 = copy.deepcopy(key)
     assert key.private_bytes_raw() == key2.private_bytes_raw()
