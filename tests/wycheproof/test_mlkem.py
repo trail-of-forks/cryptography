@@ -33,7 +33,8 @@ def test_mlkem768_decaps(backend, wycheproof):
     try:
         shared_secret = key.decapsulate(ct)
     except Exception as e:
-        print(e, f"{wycheproof.invalid=}")
+        assert wycheproof.invalid, f"Unexpected error on valid test: {e}"
+        return
     if wycheproof.valid:
         assert shared_secret == expected_ss
     else:
@@ -61,7 +62,7 @@ def test_mlkem768_keygen_seed(backend, wycheproof):
 )
 @wycheproof_tests("mlkem_768_encaps_test.json")
 def test_mlkem768_encaps_invalid_ek(backend, wycheproof):
-    if not wycheproof.valid:
+    if wycheproof.valid:
         # We can't reproduce the encapsulation without seedable RNG
         return
 
