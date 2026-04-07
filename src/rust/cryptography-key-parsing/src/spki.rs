@@ -109,11 +109,13 @@ pub fn parse_public_key(data: &[u8]) -> KeyParsingResult<ParsedPublicKey> {
             Ok(ParsedPublicKey::Pkey(openssl::pkey::PKey::from_dh(dh)?))
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        AlgorithmParameters::MlDsa65 => Ok(cryptography_openssl::mldsa::new_raw_public_key(
-            cryptography_openssl::mldsa::MlDsaVariant::MlDsa65,
-            k.subject_public_key.as_bytes(),
-        )
-        .map_err(|_| KeyParsingError::InvalidKey)?),
+        AlgorithmParameters::MlDsa65 => Ok(ParsedPublicKey::Pkey(
+            cryptography_openssl::mldsa::new_raw_public_key(
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa65,
+                k.subject_public_key.as_bytes(),
+            )
+            .map_err(|_| KeyParsingError::InvalidKey)?,
+        )),
 
         _ => Err(KeyParsingError::UnsupportedKeyType(
             k.algorithm.oid().clone(),
