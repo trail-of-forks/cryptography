@@ -173,6 +173,17 @@ fn private_key_from_pkey<'p>(
         openssl::pkey::Id::DHX => Ok(crate::backend::dh::private_key_from_pkey(pkey)
             .into_pyobject(py)?
             .into_any()),
+        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+        cryptography_openssl::mldsa::PKEY_ID => {
+            let pub_len = pkey.raw_public_key()?.len();
+            assert_eq!(
+                pub_len,
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa65.public_key_bytes()
+            );
+            Ok(crate::backend::mldsa::mldsa65_private_key_from_pkey(pkey)
+                .into_pyobject(py)?
+                .into_any())
+        }
         _ => Err(CryptographyError::from(
             exceptions::UnsupportedAlgorithm::new_err("Unsupported key type."),
         )),
@@ -329,6 +340,17 @@ fn public_key_from_pkey<'p>(
             .into_pyobject(py)?
             .into_any()),
 
+        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+        cryptography_openssl::mldsa::PKEY_ID => {
+            let pub_len = pkey.raw_public_key()?.len();
+            assert_eq!(
+                pub_len,
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa65.public_key_bytes()
+            );
+            Ok(crate::backend::mldsa::mldsa65_public_key_from_pkey(pkey)
+                .into_pyobject(py)?
+                .into_any())
+        }
         _ => Err(CryptographyError::from(
             exceptions::UnsupportedAlgorithm::new_err("Unsupported key type."),
         )),

@@ -18,7 +18,7 @@ build==1.2.2.post1 ; python_full_version < '3.9'
     # via
     #   cryptography (pyproject.toml)
     #   check-sdist
-build==1.4.0 ; python_full_version >= '3.9'
+build==1.4.2 ; python_full_version >= '3.9'
     # via
     #   cryptography (pyproject.toml)
     #   check-sdist
@@ -26,7 +26,7 @@ certifi==2026.2.25
     # via
     #   cryptography (pyproject.toml)
     #   requests
-charset-normalizer==3.4.6
+charset-normalizer==3.4.7
     # via requests
 check-sdist==1.2.0 ; python_full_version < '3.9'
     # via cryptography (pyproject.toml)
@@ -128,7 +128,7 @@ mypy==1.19.1 ; python_full_version >= '3.9'
     # via cryptography (pyproject.toml)
 mypy-extensions==1.1.0
     # via mypy
-nh3==0.3.3
+nh3==0.3.4
     # via readme-renderer
 nox==2026.2.9
     # via cryptography (pyproject.toml)
@@ -175,7 +175,7 @@ pyenchant==3.3.0 ; python_full_version >= '3.9'
     # via
     #   cryptography (pyproject.toml)
     #   sphinxcontrib-spelling
-pygments==2.19.2
+pygments==2.20.0
     # via
     #   pytest
     #   readme-renderer
@@ -219,7 +219,7 @@ pytest-xdist==3.6.1 ; python_full_version < '3.9'
     # via cryptography (pyproject.toml)
 pytest-xdist==3.8.0 ; python_full_version >= '3.9'
     # via cryptography (pyproject.toml)
-python-discovery==1.2.0
+python-discovery==1.2.1
     # via virtualenv
 pytz==2026.1.post1 ; python_full_version < '3.9'
     # via babel
@@ -235,7 +235,7 @@ requests==2.32.5 ; python_full_version >= '3.9'
     #   sphinxcontrib-spelling
 roman-numerals==4.1.0 ; python_full_version >= '3.11'
     # via sphinx
-ruff==0.15.7
+ruff==0.15.9
     # via cryptography (pyproject.toml)
 snowballstemmer==3.0.1
     # via sphinx
@@ -332,7 +332,7 @@ urllib3==2.2.3 ; python_full_version < '3.9'
     # via requests
 urllib3==2.6.3 ; python_full_version >= '3.9'
     # via requests
-uv==0.11.0
+uv==0.11.3
     # via nox
 virtualenv==21.2.0
     # via nox
