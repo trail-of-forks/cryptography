@@ -209,7 +209,9 @@ impl MlKem768PublicKey {
         py: pyo3::Python<'p>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyTuple>> {
         let (ciphertext, shared_secret) =
-            cryptography_openssl::mlkem::encapsulate(MlKemVariant::MlKem768, &self.pkey)?;
+            cryptography_openssl::mlkem::encapsulate(MlKemVariant::MlKem768, &self.pkey).map_err(
+                |_| pyo3::exceptions::PyValueError::new_err("ML-KEM-768 encapsulation failed"),
+            )?;
         let ss = pyo3::types::PyBytes::new(py, &shared_secret);
         let ct = pyo3::types::PyBytes::new(py, &ciphertext);
         Ok(pyo3::types::PyTuple::new(py, [ss.as_any(), ct.as_any()])?)

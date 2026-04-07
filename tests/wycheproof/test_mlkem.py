@@ -6,7 +6,6 @@ import binascii
 
 import pytest
 
-from cryptography.exceptions import InternalError
 from cryptography.hazmat.primitives.asymmetric.mlkem import (
     MLKEM768PrivateKey,
     MLKEM768PublicKey,
@@ -62,21 +61,24 @@ def test_mlkem768_keygen_seed(backend, wycheproof):
     skip_message="Requires a backend with ML-KEM-768 support",
 )
 @wycheproof_tests("mlkem_768_encaps_test.json")
-def test_mlkem768_encaps_invalid_ek(backend, wycheproof):
-    if wycheproof.valid:
-        # We can't reproduce the encapsulation without seedable RNG
-        return
-
+def test_mlkem768_encaps(backend, wycheproof):
     ek = binascii.unhexlify(wycheproof.testcase["ek"])
+
     try:
         pub = MLKEM768PublicKey.from_public_bytes(ek)
     except ValueError:
+        assert wycheproof.invalid
         return
 
-    # Some backends (e.g. AWS-LC) don't reject all invalid encapsulation
-    # keys upfront, so we can only check that encapsulate either raises
-    # or succeeds without crashing.
+    # We can't test deterministic encapsulation (no API to pass
+    # the random seed m), so verify the key loads and encapsulate
+    # produces correctly sized output.
     try:
-        pub.encapsulate()
-    except (ValueError, InternalError):
-        pass
+        shared_secret, ciphertext = pub.encapsulate()
+    except ValueError:
+        assert wycheproof.invalid
+        return
+
+    assert wycheproof.valid
+    assert len(shared_secret) == 32
+    assert len(ciphertext) == 1088

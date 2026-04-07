@@ -398,13 +398,13 @@ pub fn parse_encrypted_private_key(
     parse_private_key(&plaintext)
 }
 
-pub fn serialize_private_key(parsed: &ParsedPrivateKey) -> crate::KeySerializationResult<Vec<u8>> {
+pub fn serialize_private_key(key: &ParsedPrivateKey) -> crate::KeySerializationResult<Vec<u8>> {
     let p_bytes;
     let q_bytes;
     let g_bytes;
     let q_bytes_dh;
 
-    let (params, private_key_der) = match parsed {
+    let (params, private_key_der) = match key {
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         ParsedPrivateKey::MlKem768(seed) => {
             let private_key_der = asn1::write_single(&MlKemPrivateKey::Seed(*seed))?;
@@ -540,10 +540,10 @@ pub fn serialize_private_key(parsed: &ParsedPrivateKey) -> crate::KeySerializati
 const KDF_ITERATION_COUNT: u64 = 2048;
 
 pub fn serialize_encrypted_private_key(
-    parsed: &ParsedPrivateKey,
+    key: &ParsedPrivateKey,
     password: &[u8],
 ) -> crate::KeySerializationResult<Vec<u8>> {
-    let plaintext_der = serialize_private_key(parsed)?;
+    let plaintext_der = serialize_private_key(key)?;
 
     let e = pbe::EncryptionAlgorithm::PBESv2SHA256AndAES256CBC;
 
