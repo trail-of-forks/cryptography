@@ -56,7 +56,9 @@ pub(crate) fn load_der_private_key_bytes<'p>(
 
     let parsed = parsers.iter().find_map(|parser| match parser(data) {
         Ok(key) => Some(Ok(key)),
+        // Try next parser
         Err(cryptography_key_parsing::KeyParsingError::Parse(_)) => None,
+        // Return non-parse errors immediately
         Err(e) => Some(Err(e)),
     });
 
@@ -206,9 +208,15 @@ fn private_key_from_parsed<'p>(
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         cryptography_key_parsing::ParsedPrivateKey::MlKem768(seed) => {
-            Ok(crate::backend::mlkem::mlkem768_private_key_from_seed(seed)?
-                .into_pyobject(py)?
-                .into_any())
+            let pkey = cryptography_openssl::mlkem::new_from_seed(
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768,
+                &seed,
+            )?;
+            Ok(
+                crate::backend::mlkem::mlkem768_private_key_from_pkey(&pkey, seed)
+                    .into_pyobject(py)?
+                    .into_any(),
+            )
         }
     }
 }
@@ -354,7 +362,7 @@ fn public_key_from_pkey<'p>(
             .into_pyobject(py)?
             .into_any()),
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        id if id == cryptography_openssl::mlkem::PKEY_ID => {
+        cryptography_openssl::mlkem::PKEY_ID => {
             let pub_len = pkey.raw_public_key()?.len();
             assert_eq!(
                 pub_len,
