@@ -114,6 +114,13 @@ pub fn parse_public_key(data: &[u8]) -> KeyParsingResult<ParsedPublicKey> {
                 .map_err(|_| KeyParsingError::InvalidKey)?,
         )),
 
+        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+        AlgorithmParameters::MlDsa65 => Ok(cryptography_openssl::mldsa::new_raw_public_key(
+            cryptography_openssl::mldsa::MlDsaVariant::MlDsa65,
+            k.subject_public_key.as_bytes(),
+        )
+        .map_err(|_| KeyParsingError::InvalidKey)?),
+
         _ => Err(KeyParsingError::UnsupportedKeyType(
             k.algorithm.oid().clone(),
         )),
@@ -236,6 +243,15 @@ pub fn serialize_public_key(
                 cryptography_openssl::mlkem::MLKEM768_PUBLIC_KEY_BYTES
             );
             (AlgorithmParameters::MlKem768, raw_bytes)
+        }
+        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+        cryptography_openssl::mldsa::PKEY_ID => {
+            let raw_bytes = pkey.raw_public_key()?;
+            assert_eq!(
+                raw_bytes.len(),
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa65.public_key_bytes()
+            );
+            (AlgorithmParameters::MlDsa65, raw_bytes)
         }
         _ => {
             unimplemented!("Unknown key type");

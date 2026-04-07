@@ -10,6 +10,8 @@ pub mod cmac;
 pub mod fips;
 pub mod hmac;
 #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+pub mod mldsa;
+#[cfg(CRYPTOGRAPHY_IS_AWSLC)]
 pub mod mlkem;
 #[cfg(any(
     CRYPTOGRAPHY_IS_BORINGSSL,
