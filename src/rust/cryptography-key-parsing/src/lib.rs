@@ -50,7 +50,6 @@ impl From<openssl::error::ErrorStack> for KeyParsingError {
 }
 
 pub type KeyParsingResult<T> = Result<T, KeyParsingError>;
-pub type PrivateKeyParser = fn(&[u8]) -> KeyParsingResult<ParsedPrivateKey>;
 
 pub enum ParsedPrivateKey {
     Pkey(openssl::pkey::PKey<openssl::pkey::Private>),

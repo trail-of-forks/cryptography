@@ -99,12 +99,11 @@ pub fn parse_private_key(data: &[u8]) -> KeyParsingResult<ParsedPrivateKey> {
 
         AlgorithmParameters::X25519 => {
             let key_bytes = asn1::parse_single(k.private_key)?;
-            Ok(ParsedPrivateKey::Pkey(
-                openssl::pkey::PKey::private_key_from_raw_bytes(
-                    key_bytes,
-                    openssl::pkey::Id::X25519,
-                )?,
-            ))
+            let pkey = openssl::pkey::PKey::private_key_from_raw_bytes(
+                key_bytes,
+                openssl::pkey::Id::X25519,
+            )?;
+            Ok(ParsedPrivateKey::Pkey(pkey))
         }
         #[cfg(not(any(
             CRYPTOGRAPHY_IS_LIBRESSL,
@@ -113,21 +112,19 @@ pub fn parse_private_key(data: &[u8]) -> KeyParsingResult<ParsedPrivateKey> {
         )))]
         AlgorithmParameters::X448 => {
             let key_bytes = asn1::parse_single(k.private_key)?;
-            Ok(ParsedPrivateKey::Pkey(
-                openssl::pkey::PKey::private_key_from_raw_bytes(
-                    key_bytes,
-                    openssl::pkey::Id::X448,
-                )?,
-            ))
+            let pkey = openssl::pkey::PKey::private_key_from_raw_bytes(
+                key_bytes,
+                openssl::pkey::Id::X448,
+            )?;
+            Ok(ParsedPrivateKey::Pkey(pkey))
         }
         AlgorithmParameters::Ed25519 => {
             let key_bytes = asn1::parse_single(k.private_key)?;
-            Ok(ParsedPrivateKey::Pkey(
-                openssl::pkey::PKey::private_key_from_raw_bytes(
-                    key_bytes,
-                    openssl::pkey::Id::ED25519,
-                )?,
-            ))
+            let pkey = openssl::pkey::PKey::private_key_from_raw_bytes(
+                key_bytes,
+                openssl::pkey::Id::ED25519,
+            )?;
+            Ok(ParsedPrivateKey::Pkey(pkey))
         }
         #[cfg(not(any(
             CRYPTOGRAPHY_IS_LIBRESSL,
@@ -136,12 +133,11 @@ pub fn parse_private_key(data: &[u8]) -> KeyParsingResult<ParsedPrivateKey> {
         )))]
         AlgorithmParameters::Ed448 => {
             let key_bytes = asn1::parse_single(k.private_key)?;
-            Ok(ParsedPrivateKey::Pkey(
-                openssl::pkey::PKey::private_key_from_raw_bytes(
-                    key_bytes,
-                    openssl::pkey::Id::ED448,
-                )?,
-            ))
+            let pkey = openssl::pkey::PKey::private_key_from_raw_bytes(
+                key_bytes,
+                openssl::pkey::Id::ED448,
+            )?;
+            Ok(ParsedPrivateKey::Pkey(pkey))
         }
 
         // ML-KEM returns the seed rather than a PKey because AWS-LC's
