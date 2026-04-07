@@ -6,6 +6,7 @@ import binascii
 
 import pytest
 
+from cryptography.exceptions import InternalError
 from cryptography.hazmat.primitives.asymmetric.mlkem import (
     MlKem768PrivateKey,
     MlKem768PublicKey,
@@ -72,10 +73,10 @@ def test_mlkem768_encaps_invalid_ek(backend, wycheproof):
     except ValueError:
         return
 
-    # Some backends (e.g. AWS-LC) don't reject invalid encapsulation
-    # keys, so we can only check that encapsulate either raises or
-    # succeeds without crashing.
+    # Some backends (e.g. AWS-LC) don't reject all invalid encapsulation
+    # keys upfront, so we can only check that encapsulate either raises
+    # or succeeds without crashing.
     try:
         pub.encapsulate()
-    except ValueError:
+    except (ValueError, InternalError):
         pass
