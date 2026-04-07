@@ -514,8 +514,12 @@ pub fn serialize_private_key(key: &ParsedPrivateKey) -> crate::KeySerializationR
             cryptography_openssl::mldsa::PKEY_ID => {
                 let private_key_der = asn1::write_single(&mldsa_seed_from_pkey(pkey)?)?;
                 let params = match cryptography_openssl::mldsa::MlDsaVariant::from_pkey(pkey) {
-                    cryptography_openssl::mldsa::MlDsaVariant::MlDsa44 => AlgorithmParameters::MlDsa44,
-                    cryptography_openssl::mldsa::MlDsaVariant::MlDsa65 => AlgorithmParameters::MlDsa65,
+                    cryptography_openssl::mldsa::MlDsaVariant::MlDsa44 => {
+                        AlgorithmParameters::MlDsa44
+                    }
+                    cryptography_openssl::mldsa::MlDsaVariant::MlDsa65 => {
+                        AlgorithmParameters::MlDsa65
+                    }
                 };
                 (params, private_key_der)
             }
