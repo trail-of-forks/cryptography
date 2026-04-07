@@ -33,7 +33,12 @@ pub(crate) fn load_der_private_key_bytes<'p>(
     password: Option<&[u8]>,
     unsafe_skip_rsa_key_validation: bool,
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
-    let parsers: [cryptography_key_parsing::PrivateKeyParser; 4] = [
+    type Parser = fn(
+        &[u8],
+    ) -> cryptography_key_parsing::KeyParsingResult<
+        cryptography_key_parsing::ParsedPrivateKey,
+    >;
+    let parsers: [Parser; 4] = [
         cryptography_key_parsing::pkcs8::parse_private_key,
         |d| {
             cryptography_key_parsing::ec::parse_pkcs1_private_key(d, None)
@@ -51,7 +56,9 @@ pub(crate) fn load_der_private_key_bytes<'p>(
 
     let parsed = parsers.iter().find_map(|parser| match parser(data) {
         Ok(key) => Some(Ok(key)),
+        // Try next parser
         Err(cryptography_key_parsing::KeyParsingError::Parse(_)) => None,
+        // Return non-parse errors immediately
         Err(e) => Some(Err(e)),
     });
 
