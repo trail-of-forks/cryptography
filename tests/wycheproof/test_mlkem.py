@@ -8,8 +8,8 @@ import pytest
 
 from cryptography.exceptions import InternalError
 from cryptography.hazmat.primitives.asymmetric.mlkem import (
-    MlKem768PrivateKey,
-    MlKem768PublicKey,
+    MLKEM768PrivateKey,
+    MLKEM768PublicKey,
 )
 
 from .utils import wycheproof_tests
@@ -23,7 +23,7 @@ from .utils import wycheproof_tests
 def test_mlkem768_decaps(backend, wycheproof):
     seed = binascii.unhexlify(wycheproof.testcase["seed"])
     try:
-        key = MlKem768PrivateKey.from_seed_bytes(seed)
+        key = MLKEM768PrivateKey.from_seed_bytes(seed)
     except ValueError:
         assert wycheproof.invalid
         return
@@ -51,7 +51,7 @@ def test_mlkem768_keygen_seed(backend, wycheproof):
     seed = binascii.unhexlify(wycheproof.testcase["seed"])
     expected_ek = binascii.unhexlify(wycheproof.testcase["ek"])
 
-    key = MlKem768PrivateKey.from_seed_bytes(seed)
+    key = MLKEM768PrivateKey.from_seed_bytes(seed)
 
     pub = key.public_key()
     assert pub.public_bytes_raw() == expected_ek
@@ -69,7 +69,7 @@ def test_mlkem768_encaps_invalid_ek(backend, wycheproof):
 
     ek = binascii.unhexlify(wycheproof.testcase["ek"])
     try:
-        pub = MlKem768PublicKey.from_public_bytes(ek)
+        pub = MLKEM768PublicKey.from_public_bytes(ek)
     except ValueError:
         return
 

@@ -206,7 +206,7 @@ fn private_key_from_parsed<'p>(
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         cryptography_key_parsing::ParsedPrivateKey::MlKem768(seed) => {
-            Ok(crate::backend::mlkem::private_key_from_seed(seed)?
+            Ok(crate::backend::mlkem::mlkem768_private_key_from_seed(seed)?
                 .into_pyobject(py)?
                 .into_any())
         }
@@ -358,9 +358,9 @@ fn public_key_from_pkey<'p>(
             let pub_len = pkey.raw_public_key()?.len();
             assert_eq!(
                 pub_len,
-                cryptography_openssl::mlkem::MLKEM768_PUBLIC_KEY_BYTES
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768.public_key_bytes()
             );
-            Ok(crate::backend::mlkem::public_key_from_pkey(pkey)
+            Ok(crate::backend::mlkem::mlkem768_public_key_from_pkey(pkey)
                 .into_pyobject(py)?
                 .into_any())
         }

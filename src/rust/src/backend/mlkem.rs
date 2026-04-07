@@ -4,28 +4,40 @@
 
 use pyo3::types::PyAnyMethods;
 
+use cryptography_openssl::mlkem::MlKemVariant;
+
 use crate::backend::utils;
 use crate::buf::CffiBuf;
 use crate::error::{CryptographyError, CryptographyResult};
 use crate::types;
 
-#[pyo3::pyclass(frozen, module = "cryptography.hazmat.bindings._rust.openssl.mlkem")]
+#[pyo3::pyclass(
+    frozen,
+    module = "cryptography.hazmat.bindings._rust.openssl.mlkem",
+    name = "MLKEM768PrivateKey"
+)]
 pub(crate) struct MlKem768PrivateKey {
     pkey: openssl::pkey::PKey<openssl::pkey::Private>,
     seed: [u8; 64],
 }
 
-#[pyo3::pyclass(frozen, module = "cryptography.hazmat.bindings._rust.openssl.mlkem")]
+#[pyo3::pyclass(
+    frozen,
+    module = "cryptography.hazmat.bindings._rust.openssl.mlkem",
+    name = "MLKEM768PublicKey"
+)]
 pub(crate) struct MlKem768PublicKey {
     pkey: openssl::pkey::PKey<openssl::pkey::Public>,
 }
 
-pub(crate) fn private_key_from_seed(seed: [u8; 64]) -> CryptographyResult<MlKem768PrivateKey> {
-    let pkey = cryptography_openssl::mlkem::new_from_seed(&seed)?;
+pub(crate) fn mlkem768_private_key_from_seed(
+    seed: [u8; 64],
+) -> CryptographyResult<MlKem768PrivateKey> {
+    let pkey = cryptography_openssl::mlkem::new_from_seed(MlKemVariant::MlKem768, &seed)?;
     Ok(MlKem768PrivateKey { pkey, seed })
 }
 
-pub(crate) fn public_key_from_pkey(
+pub(crate) fn mlkem768_public_key_from_pkey(
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Public>,
 ) -> MlKem768PublicKey {
     MlKem768PublicKey {
@@ -34,40 +46,43 @@ pub(crate) fn public_key_from_pkey(
 }
 
 #[pyo3::pyfunction]
-fn generate_key() -> CryptographyResult<MlKem768PrivateKey> {
+fn generate_mlkem768_key() -> CryptographyResult<MlKem768PrivateKey> {
     let mut seed = [0u8; 64];
     cryptography_openssl::rand::rand_bytes(&mut seed)?;
-    private_key_from_seed(seed)
+    mlkem768_private_key_from_seed(seed)
 }
 
 #[pyo3::pyfunction]
-fn from_seed_bytes(data: CffiBuf<'_>) -> pyo3::PyResult<MlKem768PrivateKey> {
+fn from_mlkem768_seed_bytes(data: CffiBuf<'_>) -> pyo3::PyResult<MlKem768PrivateKey> {
     let seed: [u8; 64] = data.as_bytes().try_into().map_err(|_| {
         pyo3::exceptions::PyValueError::new_err("An ML-KEM-768 seed is 64 bytes long")
     })?;
-    private_key_from_seed(seed).map_err(|e| e.into())
+    mlkem768_private_key_from_seed(seed).map_err(|e| e.into())
 }
 
-// NO-COVERAGE-START
 #[pyo3::pymethods]
-// NO-COVERAGE-END
 impl MlKem768PrivateKey {
     fn decapsulate<'p>(
         &self,
         py: pyo3::Python<'p>,
         ciphertext: CffiBuf<'_>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-        let shared_secret =
-            cryptography_openssl::mlkem::decapsulate(&self.pkey, ciphertext.as_bytes()).map_err(
-                |_| pyo3::exceptions::PyValueError::new_err("Invalid ML-KEM-768 ciphertext"),
-            )?;
+        let shared_secret = cryptography_openssl::mlkem::decapsulate(
+            MlKemVariant::MlKem768,
+            &self.pkey,
+            ciphertext.as_bytes(),
+        )
+        .map_err(|_| pyo3::exceptions::PyValueError::new_err("Invalid ML-KEM-768 ciphertext"))?;
         Ok(pyo3::types::PyBytes::new(py, &shared_secret))
     }
 
     fn public_key(&self) -> CryptographyResult<MlKem768PublicKey> {
         let raw_bytes = self.pkey.raw_public_key()?;
         Ok(MlKem768PublicKey {
-            pkey: cryptography_openssl::mlkem::new_raw_public_key(&raw_bytes)?,
+            pkey: cryptography_openssl::mlkem::new_raw_public_key(
+                MlKemVariant::MlKem768,
+                &raw_bytes,
+            )?,
         })
     }
 
@@ -173,22 +188,22 @@ impl MlKem768PrivateKey {
 }
 
 #[pyo3::pyfunction]
-fn from_public_bytes(data: &[u8]) -> pyo3::PyResult<MlKem768PublicKey> {
-    let pkey = cryptography_openssl::mlkem::new_raw_public_key(data).map_err(|_| {
-        pyo3::exceptions::PyValueError::new_err("An ML-KEM-768 public key is 1184 bytes long")
-    })?;
+fn from_mlkem768_public_bytes(data: &[u8]) -> pyo3::PyResult<MlKem768PublicKey> {
+    let pkey = cryptography_openssl::mlkem::new_raw_public_key(MlKemVariant::MlKem768, data)
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err("An ML-KEM-768 public key is 1184 bytes long")
+        })?;
     Ok(MlKem768PublicKey { pkey })
 }
 
-// NO-COVERAGE-START
 #[pyo3::pymethods]
-// NO-COVERAGE-END
 impl MlKem768PublicKey {
     fn encapsulate<'p>(
         &self,
         py: pyo3::Python<'p>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyTuple>> {
-        let (ciphertext, shared_secret) = cryptography_openssl::mlkem::encapsulate(&self.pkey)?;
+        let (ciphertext, shared_secret) =
+            cryptography_openssl::mlkem::encapsulate(MlKemVariant::MlKem768, &self.pkey)?;
         let ss = pyo3::types::PyBytes::new(py, &shared_secret);
         let ct = pyo3::types::PyBytes::new(py, &ciphertext);
         Ok(pyo3::types::PyTuple::new(py, [ss.as_any(), ct.as_any()])?)
@@ -231,6 +246,7 @@ impl MlKem768PublicKey {
 pub(crate) mod mlkem {
     #[pymodule_export]
     use super::{
-        from_public_bytes, from_seed_bytes, generate_key, MlKem768PrivateKey, MlKem768PublicKey,
+        from_mlkem768_public_bytes, from_mlkem768_seed_bytes, generate_mlkem768_key,
+        MlKem768PrivateKey, MlKem768PublicKey,
     };
 }

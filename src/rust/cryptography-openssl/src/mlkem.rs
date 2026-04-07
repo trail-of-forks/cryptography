@@ -8,11 +8,26 @@ use std::os::raw::c_int;
 
 use crate::{cvt, cvt_p, OpenSSLResult};
 
-pub const NID_MLKEM768: c_int = ffi::NID_MLKEM768;
 pub const PKEY_ID: openssl::pkey::Id = openssl::pkey::Id::from_raw(ffi::NID_kem);
-pub const MLKEM768_PUBLIC_KEY_BYTES: usize = 1184;
-pub const MLKEM768_SHARED_SECRET_BYTES: usize = 32;
-pub const MLKEM768_SEED_BYTES: usize = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MlKemVariant {
+    MlKem768,
+}
+
+impl MlKemVariant {
+    pub fn nid(self) -> c_int {
+        match self {
+            MlKemVariant::MlKem768 => ffi::NID_MLKEM768,
+        }
+    }
+
+    pub fn public_key_bytes(self) -> usize {
+        match self {
+            MlKemVariant::MlKem768 => 1184,
+        }
+    }
+}
 
 extern "C" {
     fn EVP_PKEY_kem_new_raw_public_key(
@@ -47,10 +62,13 @@ extern "C" {
     ) -> c_int;
 }
 
-pub fn new_from_seed(seed: &[u8]) -> OpenSSLResult<openssl::pkey::PKey<openssl::pkey::Private>> {
+pub fn new_from_seed(
+    variant: MlKemVariant,
+    seed: &[u8],
+) -> OpenSSLResult<openssl::pkey::PKey<openssl::pkey::Private>> {
     let ctx = openssl::pkey_ctx::PkeyCtx::new_id(PKEY_ID)?;
     // SAFETY: ctx is a valid EVP_PKEY_CTX for KEM.
-    unsafe { cvt(EVP_PKEY_CTX_kem_set_params(ctx.as_ptr(), NID_MLKEM768))? };
+    unsafe { cvt(EVP_PKEY_CTX_kem_set_params(ctx.as_ptr(), variant.nid()))? };
     // SAFETY: ctx is a valid EVP_PKEY_CTX with KEM params set.
     unsafe { cvt(ffi::EVP_PKEY_keygen_init(ctx.as_ptr()))? };
 
@@ -64,17 +82,24 @@ pub fn new_from_seed(seed: &[u8]) -> OpenSSLResult<openssl::pkey::PKey<openssl::
             seed.as_ptr(),
             &mut seed_len,
         ))?;
-        Ok(openssl::pkey::PKey::from_ptr(pkey))
     }
+    let expected_seed_len = match variant {
+        MlKemVariant::MlKem768 => 64,
+    };
+    assert_eq!(seed_len, expected_seed_len);
+    // SAFETY: EVP_PKEY_keygen_deterministic succeeded, pkey is valid.
+    let pkey = unsafe { openssl::pkey::PKey::from_ptr(pkey) };
+    Ok(pkey)
 }
 
 pub fn new_raw_public_key(
+    variant: MlKemVariant,
     data: &[u8],
 ) -> OpenSSLResult<openssl::pkey::PKey<openssl::pkey::Public>> {
     // SAFETY: data points to valid memory of the given length.
     unsafe {
         let pkey = cvt_p(EVP_PKEY_kem_new_raw_public_key(
-            NID_MLKEM768,
+            variant.nid(),
             data.as_ptr(),
             data.len(),
         ))?;
@@ -83,26 +108,19 @@ pub fn new_raw_public_key(
 }
 
 pub fn encapsulate(
+    variant: MlKemVariant,
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Public>,
 ) -> OpenSSLResult<(Vec<u8>, Vec<u8>)> {
+    let (ct_bytes, ss_bytes) = match variant {
+        MlKemVariant::MlKem768 => (1088, 32),
+    };
     let ctx = openssl::pkey_ctx::PkeyCtx::new(pkey)?;
 
-    let mut ct_len: usize = 0;
-    let mut ss_len: usize = 0;
-    // SAFETY: NULL output pointers to query required buffer sizes.
-    unsafe {
-        cvt(EVP_PKEY_encapsulate(
-            ctx.as_ptr(),
-            std::ptr::null_mut(),
-            &mut ct_len,
-            std::ptr::null_mut(),
-            &mut ss_len,
-        ))?;
-    }
-
-    let mut ciphertext = vec![0u8; ct_len];
-    let mut shared_secret = vec![0u8; ss_len];
-    // SAFETY: output buffers are allocated to the sizes returned above.
+    let mut ciphertext = vec![0u8; ct_bytes];
+    let mut shared_secret = vec![0u8; ss_bytes];
+    let mut ct_len = ciphertext.len();
+    let mut ss_len = shared_secret.len();
+    // SAFETY: ctx is a valid EVP_PKEY_CTX, buffers are correctly sized.
     unsafe {
         cvt(EVP_PKEY_encapsulate(
             ctx.as_ptr(),
@@ -112,18 +130,21 @@ pub fn encapsulate(
             &mut ss_len,
         ))?;
     }
-    ciphertext.truncate(ct_len);
-    shared_secret.truncate(ss_len);
+    assert_eq!(ct_len, ct_bytes);
+    assert_eq!(ss_len, ss_bytes);
     Ok((ciphertext, shared_secret))
 }
 
 pub fn decapsulate(
+    variant: MlKemVariant,
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
     ciphertext: &[u8],
 ) -> OpenSSLResult<Vec<u8>> {
     let ctx = openssl::pkey_ctx::PkeyCtx::new(pkey)?;
 
-    let mut ss_len: usize = MLKEM768_SHARED_SECRET_BYTES;
+    let mut ss_len: usize = match variant {
+        MlKemVariant::MlKem768 => 32,
+    };
     let mut shared_secret = vec![0u8; ss_len];
     // SAFETY: ctx is a valid EVP_PKEY_CTX, buffers are correctly sized.
     unsafe {

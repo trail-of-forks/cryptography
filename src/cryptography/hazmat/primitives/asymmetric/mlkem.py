@@ -12,9 +12,9 @@ from cryptography.hazmat.primitives import _serialization
 from cryptography.utils import Buffer
 
 
-class MlKem768PublicKey(metaclass=abc.ABCMeta):
+class MLKEM768PublicKey(metaclass=abc.ABCMeta):
     @classmethod
-    def from_public_bytes(cls, data: Buffer) -> MlKem768PublicKey:
+    def from_public_bytes(cls, data: Buffer) -> MLKEM768PublicKey:
         from cryptography.hazmat.backends.openssl.backend import backend
 
         if not backend.mlkem_supported():
@@ -23,7 +23,7 @@ class MlKem768PublicKey(metaclass=abc.ABCMeta):
                 _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM,
             )
 
-        return rust_openssl.mlkem.from_public_bytes(data)
+        return rust_openssl.mlkem.from_mlkem768_public_bytes(data)
 
     @abc.abstractmethod
     def encapsulate(self) -> tuple[bytes, bytes]:
@@ -57,25 +57,25 @@ class MlKem768PublicKey(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def __copy__(self) -> MlKem768PublicKey:
+    def __copy__(self) -> MLKEM768PublicKey:
         """
         Returns a copy.
         """
 
     @abc.abstractmethod
-    def __deepcopy__(self, memo: dict) -> MlKem768PublicKey:
+    def __deepcopy__(self, memo: dict) -> MLKEM768PublicKey:
         """
         Returns a deep copy.
         """
 
 
 if hasattr(rust_openssl, "mlkem"):
-    MlKem768PublicKey.register(rust_openssl.mlkem.MlKem768PublicKey)
+    MLKEM768PublicKey.register(rust_openssl.mlkem.MLKEM768PublicKey)
 
 
-class MlKem768PrivateKey(metaclass=abc.ABCMeta):
+class MLKEM768PrivateKey(metaclass=abc.ABCMeta):
     @classmethod
-    def generate(cls) -> MlKem768PrivateKey:
+    def generate(cls) -> MLKEM768PrivateKey:
         from cryptography.hazmat.backends.openssl.backend import backend
 
         if not backend.mlkem_supported():
@@ -84,10 +84,10 @@ class MlKem768PrivateKey(metaclass=abc.ABCMeta):
                 _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM,
             )
 
-        return rust_openssl.mlkem.generate_key()
+        return rust_openssl.mlkem.generate_mlkem768_key()
 
     @classmethod
-    def from_seed_bytes(cls, data: Buffer) -> MlKem768PrivateKey:
+    def from_seed_bytes(cls, data: Buffer) -> MLKEM768PrivateKey:
         from cryptography.hazmat.backends.openssl.backend import backend
 
         if not backend.mlkem_supported():
@@ -96,7 +96,7 @@ class MlKem768PrivateKey(metaclass=abc.ABCMeta):
                 _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM,
             )
 
-        return rust_openssl.mlkem.from_seed_bytes(data)
+        return rust_openssl.mlkem.from_mlkem768_seed_bytes(data)
 
     @abc.abstractmethod
     def decapsulate(self, ciphertext: Buffer) -> bytes:
@@ -105,9 +105,9 @@ class MlKem768PrivateKey(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def public_key(self) -> MlKem768PublicKey:
+    def public_key(self) -> MLKEM768PublicKey:
         """
-        The MlKem768PublicKey derived from this private key.
+        The MLKEM768PublicKey derived from this private key.
         """
 
     @abc.abstractmethod
@@ -129,17 +129,17 @@ class MlKem768PrivateKey(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def __copy__(self) -> MlKem768PrivateKey:
+    def __copy__(self) -> MLKEM768PrivateKey:
         """
         Returns a copy.
         """
 
     @abc.abstractmethod
-    def __deepcopy__(self, memo: dict) -> MlKem768PrivateKey:
+    def __deepcopy__(self, memo: dict) -> MLKEM768PrivateKey:
         """
         Returns a deep copy.
         """
 
 
 if hasattr(rust_openssl, "mlkem"):
-    MlKem768PrivateKey.register(rust_openssl.mlkem.MlKem768PrivateKey)
+    MLKEM768PrivateKey.register(rust_openssl.mlkem.MLKEM768PrivateKey)

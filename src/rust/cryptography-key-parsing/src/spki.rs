@@ -110,8 +110,11 @@ pub fn parse_public_key(data: &[u8]) -> KeyParsingResult<ParsedPublicKey> {
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         AlgorithmParameters::MlKem768 => Ok(ParsedPublicKey::Pkey(
-            cryptography_openssl::mlkem::new_raw_public_key(k.subject_public_key.as_bytes())
-                .map_err(|_| KeyParsingError::InvalidKey)?,
+            cryptography_openssl::mlkem::new_raw_public_key(
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768,
+                k.subject_public_key.as_bytes(),
+            )
+            .map_err(|_| KeyParsingError::InvalidKey)?,
         )),
 
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
@@ -238,11 +241,11 @@ pub fn serialize_public_key(
             (params, pub_key_der)
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        id if id == cryptography_openssl::mlkem::PKEY_ID => {
+        cryptography_openssl::mlkem::PKEY_ID => {
             let raw_bytes = pkey.raw_public_key()?;
             assert_eq!(
                 raw_bytes.len(),
-                cryptography_openssl::mlkem::MLKEM768_PUBLIC_KEY_BYTES
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768.public_key_bytes()
             );
             (AlgorithmParameters::MlKem768, raw_bytes)
         }
