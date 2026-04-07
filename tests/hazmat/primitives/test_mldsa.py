@@ -13,8 +13,10 @@ import pytest
 from cryptography.exceptions import InvalidSignature, _Reasons
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.mldsa import (
-    MlDsa65PrivateKey,
-    MlDsa65PublicKey,
+    MLDSA44PrivateKey,
+    MLDSA44PublicKey,
+    MLDSA65PrivateKey,
+    MLDSA65PublicKey,
 )
 
 from ...doubles import DummyKeySerializationEncryption
@@ -26,7 +28,7 @@ from ...utils import (
 
 
 @dataclasses.dataclass
-class MlDsaVariant:
+class MLDSAVariant:
     private_key_class: type
     public_key_class: type
     pub_key_size: int
@@ -36,9 +38,19 @@ class MlDsaVariant:
 
 ML_DSA_VARIANTS = [
     pytest.param(
-        MlDsaVariant(
-            private_key_class=MlDsa65PrivateKey,
-            public_key_class=MlDsa65PublicKey,
+        MLDSAVariant(
+            private_key_class=MLDSA44PrivateKey,
+            public_key_class=MLDSA44PublicKey,
+            pub_key_size=1312,
+            sig_size=2420,
+            seed_size=32,
+        ),
+        id="ML-DSA-44",
+    ),
+    pytest.param(
+        MLDSAVariant(
+            private_key_class=MLDSA65PrivateKey,
+            public_key_class=MLDSA65PublicKey,
             pub_key_size=1952,
             sig_size=3309,
             seed_size=32,
@@ -50,30 +62,45 @@ ML_DSA_VARIANTS = [
 
 @pytest.mark.supported(
     only_if=lambda backend: not backend.mldsa_supported(),
-    skip_message="Requires a backend without ML-DSA-65 support",
+    skip_message="Requires a backend without ML-DSA support",
 )
 def test_mldsa_unsupported(backend):
     with raises_unsupported_algorithm(
         _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
     ):
-        MlDsa65PublicKey.from_public_bytes(b"0" * 1952)
+        MLDSA44PublicKey.from_public_bytes(b"0" * 1312)
 
     with raises_unsupported_algorithm(
         _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
     ):
-        MlDsa65PrivateKey.from_seed_bytes(b"0" * 32)
+        MLDSA44PrivateKey.from_seed_bytes(b"0" * 32)
 
     with raises_unsupported_algorithm(
         _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
     ):
-        MlDsa65PrivateKey.generate()
+        MLDSA44PrivateKey.generate()
+
+    with raises_unsupported_algorithm(
+        _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
+    ):
+        MLDSA65PublicKey.from_public_bytes(b"0" * 1952)
+
+    with raises_unsupported_algorithm(
+        _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
+    ):
+        MLDSA65PrivateKey.from_seed_bytes(b"0" * 32)
+
+    with raises_unsupported_algorithm(
+        _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
+    ):
+        MLDSA65PrivateKey.generate()
 
 
 @pytest.mark.supported(
     only_if=lambda backend: backend.mldsa_supported(),
-    skip_message="Requires a backend with ML-DSA-65 support",
+    skip_message="Requires a backend with ML-DSA support",
 )
-class TestMlDsa:
+class TestMLDSA:
     @pytest.mark.parametrize("variant", ML_DSA_VARIANTS)
     def test_sign_verify(self, variant, backend):
         key = variant.private_key_class.generate()
@@ -109,7 +136,28 @@ class TestMlDsa:
         sig2 = key.sign(data, b"")
         pub.verify(sig2, data)
 
-    def test_kat_vectors(self, backend, subtests):
+    def test_kat_vectors_44(self, backend, subtests):
+        vectors = load_vectors_from_file(
+            os.path.join("asymmetric", "MLDSA", "kat_MLDSA_44_det_pure.rsp"),
+            load_nist_vectors,
+        )
+        for vector in vectors:
+            with subtests.test():
+                xi = binascii.unhexlify(vector["xi"])
+                pk = binascii.unhexlify(vector["pk"])
+                msg = binascii.unhexlify(vector["msg"])
+                ctx = binascii.unhexlify(vector["ctx"])
+                sm = binascii.unhexlify(vector["sm"])
+                expected_sig = sm[:2420]
+
+                key = MLDSA44PrivateKey.from_seed_bytes(xi)
+                assert key.private_bytes_raw() == xi
+                assert key.public_key().public_bytes_raw() == pk
+
+                pub = MLDSA44PublicKey.from_public_bytes(pk)
+                pub.verify(expected_sig, msg, ctx)
+
+    def test_kat_vectors_65(self, backend, subtests):
         vectors = load_vectors_from_file(
             os.path.join("asymmetric", "MLDSA", "kat_MLDSA_65_det_pure.rsp"),
             load_nist_vectors,
@@ -123,11 +171,11 @@ class TestMlDsa:
                 sm = binascii.unhexlify(vector["sm"])
                 expected_sig = sm[:3309]
 
-                key = MlDsa65PrivateKey.from_seed_bytes(xi)
+                key = MLDSA65PrivateKey.from_seed_bytes(xi)
                 assert key.private_bytes_raw() == xi
                 assert key.public_key().public_bytes_raw() == pk
 
-                pub = MlDsa65PublicKey.from_public_bytes(pk)
+                pub = MLDSA65PublicKey.from_public_bytes(pk)
                 pub.verify(expected_sig, msg, ctx)
 
     @pytest.mark.parametrize("variant", ML_DSA_VARIANTS)
@@ -358,26 +406,7 @@ class TestMlDsa:
 
 @pytest.mark.supported(
     only_if=lambda backend: backend.mldsa_supported(),
-    skip_message="Requires a backend with ML-DSA-65 support",
-)
-def test_unsupported_mldsa_variant_private_key(backend):
-    # ML-DSA-44 is not supported; loading it must raise UnsupportedAlgorithm.
-    pkcs8_der = load_vectors_from_file(
-        os.path.join("asymmetric", "MLDSA", "mldsa44_priv.der"),
-        lambda derfile: derfile.read(),
-        mode="rb",
-    )
-    with raises_unsupported_algorithm(
-        _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
-    ):
-        serialization.load_der_private_key(
-            pkcs8_der, password=None, backend=backend
-        )
-
-
-@pytest.mark.supported(
-    only_if=lambda backend: backend.mldsa_supported(),
-    skip_message="Requires a backend with ML-DSA-65 support",
+    skip_message="Requires a backend with ML-DSA support",
 )
 def test_mldsa65_private_key_no_seed(backend):
     pkcs8_der = load_vectors_from_file(
@@ -389,20 +418,3 @@ def test_mldsa65_private_key_no_seed(backend):
         serialization.load_der_private_key(
             pkcs8_der, password=None, backend=backend
         )
-
-
-@pytest.mark.supported(
-    only_if=lambda backend: backend.mldsa_supported(),
-    skip_message="Requires a backend with ML-DSA-65 support",
-)
-def test_unsupported_mldsa_variant_public_key(backend):
-    # ML-DSA-44 is not supported; loading it must raise UnsupportedAlgorithm.
-    spki_der = load_vectors_from_file(
-        os.path.join("asymmetric", "MLDSA", "mldsa44_pub.der"),
-        lambda derfile: derfile.read(),
-        mode="rb",
-    )
-    with raises_unsupported_algorithm(
-        _Reasons.UNSUPPORTED_PUBLIC_KEY_ALGORITHM
-    ):
-        serialization.load_der_public_key(spki_der, backend=backend)
