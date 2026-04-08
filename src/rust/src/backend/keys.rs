@@ -216,11 +216,8 @@ fn private_key_from_parsed<'p>(
             private_key_from_pkey(py, &pkey, unsafe_skip_rsa_key_validation)
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        cryptography_key_parsing::ParsedPrivateKey::MlKem768(seed) => {
-            let pkey = cryptography_openssl::mlkem::new_from_seed(
-                cryptography_openssl::mlkem::MlKemVariant::MlKem768,
-                &seed,
-            )?;
+        cryptography_key_parsing::ParsedPrivateKey::MlKem(variant, seed) => {
+            let pkey = cryptography_openssl::mlkem::new_from_seed(variant, &seed)?;
             Ok(
                 crate::backend::mlkem::mlkem768_private_key_from_pkey(&pkey, seed)
                     .into_pyobject(py)?

@@ -163,7 +163,10 @@ impl MlKem768PrivateKey {
             ));
         }
 
-        let parsed = cryptography_key_parsing::ParsedPrivateKey::MlKem768(self.seed);
+        let parsed = cryptography_key_parsing::ParsedPrivateKey::MlKem(
+            cryptography_openssl::mlkem::MlKemVariant::MlKem768,
+            self.seed,
+        );
         let (tag, der_bytes) = if password.is_empty() {
             (
                 "PRIVATE KEY",

@@ -54,7 +54,7 @@ pub type KeyParsingResult<T> = Result<T, KeyParsingError>;
 pub enum ParsedPrivateKey {
     Pkey(openssl::pkey::PKey<openssl::pkey::Private>),
     #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-    MlKem768([u8; 64]),
+    MlKem(cryptography_openssl::mlkem::MlKemVariant, [u8; 64]),
 }
 
 pub enum ParsedPublicKey {
