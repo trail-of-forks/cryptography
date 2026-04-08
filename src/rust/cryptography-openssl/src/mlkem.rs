@@ -30,30 +30,6 @@ impl MlKemVariant {
 }
 
 extern "C" {
-    fn EVP_PKEY_kem_new_raw_public_key(
-        nid: c_int,
-        in_: *const u8,
-        len: usize,
-    ) -> *mut ffi::EVP_PKEY;
-
-    fn EVP_PKEY_CTX_kem_set_params(ctx: *mut ffi::EVP_PKEY_CTX, nid: c_int) -> c_int;
-
-    fn EVP_PKEY_encapsulate(
-        ctx: *mut ffi::EVP_PKEY_CTX,
-        ciphertext: *mut u8,
-        ciphertext_len: *mut usize,
-        shared_secret: *mut u8,
-        shared_secret_len: *mut usize,
-    ) -> c_int;
-
-    fn EVP_PKEY_decapsulate(
-        ctx: *mut ffi::EVP_PKEY_CTX,
-        shared_secret: *mut u8,
-        shared_secret_len: *mut usize,
-        ciphertext: *const u8,
-        ciphertext_len: usize,
-    ) -> c_int;
-
     fn EVP_PKEY_keygen_deterministic(
         ctx: *mut ffi::EVP_PKEY_CTX,
         out_pkey: *mut *mut ffi::EVP_PKEY,
@@ -68,7 +44,12 @@ pub fn new_from_seed(
 ) -> OpenSSLResult<openssl::pkey::PKey<openssl::pkey::Private>> {
     let ctx = openssl::pkey_ctx::PkeyCtx::new_id(PKEY_ID)?;
     // SAFETY: ctx is a valid EVP_PKEY_CTX for KEM.
-    unsafe { cvt(EVP_PKEY_CTX_kem_set_params(ctx.as_ptr(), variant.nid()))? };
+    unsafe {
+        cvt(ffi::EVP_PKEY_CTX_kem_set_params(
+            ctx.as_ptr(),
+            variant.nid(),
+        ))?
+    };
     // SAFETY: ctx is a valid EVP_PKEY_CTX with KEM params set.
     unsafe { cvt(ffi::EVP_PKEY_keygen_init(ctx.as_ptr()))? };
 
@@ -98,7 +79,7 @@ pub fn new_raw_public_key(
 ) -> OpenSSLResult<openssl::pkey::PKey<openssl::pkey::Public>> {
     // SAFETY: data points to valid memory of the given length.
     unsafe {
-        let pkey = cvt_p(EVP_PKEY_kem_new_raw_public_key(
+        let pkey = cvt_p(ffi::EVP_PKEY_kem_new_raw_public_key(
             variant.nid(),
             data.as_ptr(),
             data.len(),
@@ -122,7 +103,7 @@ pub fn encapsulate(
     let mut ss_len = shared_secret.len();
     // SAFETY: ctx is a valid EVP_PKEY_CTX, buffers are correctly sized.
     unsafe {
-        cvt(EVP_PKEY_encapsulate(
+        cvt(ffi::EVP_PKEY_encapsulate(
             ctx.as_ptr(),
             ciphertext.as_mut_ptr(),
             &mut ct_len,
@@ -148,7 +129,7 @@ pub fn decapsulate(
     let mut shared_secret = vec![0u8; ss_len];
     // SAFETY: ctx is a valid EVP_PKEY_CTX, buffers are correctly sized.
     unsafe {
-        cvt(EVP_PKEY_decapsulate(
+        cvt(ffi::EVP_PKEY_decapsulate(
             ctx.as_ptr(),
             shared_secret.as_mut_ptr(),
             &mut ss_len,
