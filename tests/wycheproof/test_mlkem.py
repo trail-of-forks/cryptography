@@ -35,10 +35,8 @@ def test_mlkem768_decaps(backend, wycheproof):
     except Exception as e:
         assert wycheproof.invalid, f"Unexpected error on valid test: {e}"
         return
-    if wycheproof.valid:
-        assert shared_secret == expected_ss
-    else:
-        assert shared_secret != expected_ss
+
+    assert shared_secret == expected_ss
 
 
 @pytest.mark.supported(

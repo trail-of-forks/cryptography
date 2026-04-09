@@ -2,7 +2,9 @@
 # 2.0, and the BSD License. See the LICENSE file in the root of this repository
 # for complete details.
 
+import binascii
 import copy
+import os
 
 import pytest
 
@@ -14,7 +16,11 @@ from cryptography.hazmat.primitives.asymmetric.mlkem import (
 )
 
 from ...doubles import DummyKeySerializationEncryption
-from ...utils import raises_unsupported_algorithm
+from ...utils import (
+    load_nist_vectors,
+    load_vectors_from_file,
+    raises_unsupported_algorithm,
+)
 
 
 @pytest.mark.supported(
@@ -140,32 +146,86 @@ class TestMLKEM768:
                 object()  # type: ignore[arg-type]
             )
 
-    def test_invalid_private_bytes(self, backend):
-        key = MLKEM768PrivateKey.generate()
-        with pytest.raises(TypeError):
-            key.private_bytes(
-                serialization.Encoding.Raw,
-                serialization.PrivateFormat.Raw,
-                None,  # type: ignore[arg-type]
-            )
-        with pytest.raises(ValueError):
-            key.private_bytes(
+    def test_kat_vectors(self, backend):
+        vectors = load_vectors_from_file(
+            os.path.join("asymmetric", "MLKEM", "kat_MLKEM_768.rsp"),
+            load_nist_vectors,
+        )
+        for vector in vectors:
+            d = binascii.unhexlify(vector["d"])
+            z = binascii.unhexlify(vector["z"])
+
+            seed = d + z
+            key = MLKEM768PrivateKey.from_seed_bytes(seed)
+            assert key.private_bytes_raw() == seed
+
+            # Verify public key matches
+            pub = key.public_key()
+            assert pub.public_bytes_raw() == binascii.unhexlify(vector["pk"])
+
+            # Verify decapsulation produces the expected shared secret
+            ss = key.decapsulate(binascii.unhexlify(vector["ct"]))
+            assert ss == binascii.unhexlify(vector["ss"])
+
+            # Decapsulating an invalid ciphertext should use
+            # implicit rejection, producing a deterministic but
+            # different shared secret.
+            ss_n = key.decapsulate(binascii.unhexlify(vector["ct_n"]))
+            assert ss_n == binascii.unhexlify(vector["ss_n"])
+
+    @pytest.mark.parametrize(
+        ("encoding", "fmt", "encryption", "err"),
+        [
+            (
                 serialization.Encoding.Raw,
                 serialization.PrivateFormat.Raw,
                 DummyKeySerializationEncryption(),
-            )
-        with pytest.raises(ValueError):
-            key.private_bytes(
+                ValueError,
+            ),
+            (
                 serialization.Encoding.Raw,
                 serialization.PrivateFormat.PKCS8,
                 DummyKeySerializationEncryption(),
-            )
-        with pytest.raises(ValueError):
-            key.private_bytes(
+                ValueError,
+            ),
+            (
                 serialization.Encoding.PEM,
                 serialization.PrivateFormat.Raw,
                 serialization.NoEncryption(),
-            )
+                ValueError,
+            ),
+            (
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.OpenSSH,
+                serialization.NoEncryption(),
+                ValueError,
+            ),
+            (
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                DummyKeySerializationEncryption(),
+                ValueError,
+            ),
+            (
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.BestAvailableEncryption(b"a" * 1024),
+                ValueError,
+            ),
+            (
+                serialization.Encoding.Raw,
+                serialization.PrivateFormat.Raw,
+                None,
+                TypeError,
+            ),
+        ],
+    )
+    def test_invalid_private_bytes(
+        self, encoding, fmt, encryption, err, backend
+    ):
+        key = MLKEM768PrivateKey.generate()
+        with pytest.raises(err):
+            key.private_bytes(encoding, fmt, encryption)
 
     def test_invalid_public_bytes(self, backend):
         key = MLKEM768PrivateKey.generate().public_key()
