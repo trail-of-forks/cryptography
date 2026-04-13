@@ -159,6 +159,41 @@ class TestMLKEM768:
                 object()  # type: ignore[arg-type]
             )
 
+    def test_kat_serialization(self, backend):
+        vectors = load_vectors_from_file(
+            os.path.join("asymmetric", "MLKEM", "kat_MLKEM_768.rsp"),
+            load_nist_vectors,
+        )
+
+        first_vector = next(iter(vectors))
+        d = binascii.unhexlify(first_vector["d"])
+        z = binascii.unhexlify(first_vector["z"])
+        key = MLKEM768PrivateKey.from_seed_bytes(d + z)
+
+        serialized_pem = key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+        kat_pem = load_vectors_from_file(
+            os.path.join("asymmetric", "MLKEM", "mlkem768.pem"),
+            lambda f: f.read(),
+            mode="rb",
+        )
+        assert serialized_pem == kat_pem
+
+        serialized_der = key.private_bytes(
+            serialization.Encoding.DER,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+        kat_der = load_vectors_from_file(
+            os.path.join("asymmetric", "MLKEM", "mlkem768.der"),
+            lambda f: f.read(),
+            mode="rb",
+        )
+        assert serialized_der == kat_der
+
     def test_kat_vectors(self, backend):
         vectors = load_vectors_from_file(
             os.path.join("asymmetric", "MLKEM", "kat_MLKEM_768.rsp"),
