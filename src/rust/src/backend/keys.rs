@@ -218,11 +218,13 @@ fn private_key_from_parsed<'p>(
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         cryptography_key_parsing::ParsedPrivateKey::MlKem(variant, seed) => {
             let pkey = cryptography_openssl::mlkem::new_from_seed(variant, &seed)?;
-            Ok(
-                crate::backend::mlkem::mlkem768_private_key_from_pkey(&pkey, seed)
-                    .into_pyobject(py)?
-                    .into_any(),
-            )
+            match variant {
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768 => Ok(
+                    crate::backend::mlkem::mlkem768_private_key_from_pkey(&pkey, seed)
+                        .into_pyobject(py)?
+                        .into_any(),
+                ),
+            }
         }
     }
 }
@@ -366,14 +368,13 @@ fn public_key_from_pkey<'p>(
             .into_any()),
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         cryptography_openssl::mlkem::PKEY_ID => {
-            let pub_len = pkey.raw_public_key()?.len();
-            assert_eq!(
-                pub_len,
-                cryptography_openssl::mlkem::MlKemVariant::MlKem768.public_key_bytes()
-            );
-            Ok(crate::backend::mlkem::mlkem768_public_key_from_pkey(pkey)
-                .into_pyobject(py)?
-                .into_any())
+            match cryptography_openssl::mlkem::MlKemVariant::from_pkey(pkey) {
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768 => {
+                    Ok(crate::backend::mlkem::mlkem768_public_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+            }
         }
 
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]

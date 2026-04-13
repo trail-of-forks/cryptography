@@ -22,9 +22,18 @@ impl MlKemVariant {
         }
     }
 
-    pub fn public_key_bytes(self) -> usize {
-        match self {
-            MlKemVariant::MlKem768 => 1184,
+    pub fn from_pkey<T: openssl::pkey::HasPublic>(
+        pkey: &openssl::pkey::PKeyRef<T>,
+    ) -> MlKemVariant {
+        // AWS-LC is missing the equivalent `EVP_PKEY_pqdsa_get_type`, so we
+        // are using the key size as a discriminator to find the variant.
+        let len = pkey
+            .raw_public_key()
+            .expect("valid ML-KEM public key")
+            .len();
+        match len {
+            1184 => MlKemVariant::MlKem768,
+            _ => panic!("Unsupported ML-KEM variant"),
         }
     }
 }

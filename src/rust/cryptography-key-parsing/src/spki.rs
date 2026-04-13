@@ -258,11 +258,12 @@ pub fn serialize_public_key(
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         cryptography_openssl::mlkem::PKEY_ID => {
             let raw_bytes = pkey.raw_public_key()?;
-            assert_eq!(
-                raw_bytes.len(),
-                cryptography_openssl::mlkem::MlKemVariant::MlKem768.public_key_bytes()
-            );
-            (AlgorithmParameters::MlKem768, raw_bytes)
+            let params = match cryptography_openssl::mlkem::MlKemVariant::from_pkey(pkey) {
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768 => {
+                    AlgorithmParameters::MlKem768
+                }
+            };
+            (params, raw_bytes)
         }
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         cryptography_openssl::mldsa::PKEY_ID => {
