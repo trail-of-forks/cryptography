@@ -39,6 +39,9 @@ impl MlKemVariant {
 }
 
 extern "C" {
+    // Manually declared because this function is in an experimental header
+    // in AWS-LC (April 2026).
+    // https://github.com/aws/aws-lc/blob/23b13826748f942ed7d6c4bcb9971dc9244cbc6f/include/openssl/experimental/kem_deterministic_api.h#L31
     fn EVP_PKEY_keygen_deterministic(
         ctx: *mut ffi::EVP_PKEY_CTX,
         out_pkey: *mut *mut ffi::EVP_PKEY,
