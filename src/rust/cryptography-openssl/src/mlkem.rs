@@ -98,10 +98,9 @@ pub fn new_raw_public_key(
 }
 
 pub fn encapsulate(
-    variant: MlKemVariant,
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Public>,
 ) -> OpenSSLResult<(Vec<u8>, Vec<u8>)> {
-    let (ct_bytes, ss_bytes) = match variant {
+    let (ct_bytes, ss_bytes) = match MlKemVariant::from_pkey(pkey) {
         MlKemVariant::MlKem768 => (1088, 32),
     };
     let ctx = openssl::pkey_ctx::PkeyCtx::new(pkey)?;
@@ -126,13 +125,12 @@ pub fn encapsulate(
 }
 
 pub fn decapsulate(
-    variant: MlKemVariant,
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
     ciphertext: &[u8],
 ) -> OpenSSLResult<Vec<u8>> {
     let ctx = openssl::pkey_ctx::PkeyCtx::new(pkey)?;
 
-    let mut ss_len: usize = match variant {
+    let mut ss_len: usize = match MlKemVariant::from_pkey(pkey) {
         MlKemVariant::MlKem768 => 32,
     };
     let mut shared_secret = vec![0u8; ss_len];

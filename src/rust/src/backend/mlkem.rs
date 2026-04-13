@@ -73,12 +73,10 @@ impl MlKem768PrivateKey {
         py: pyo3::Python<'p>,
         ciphertext: CffiBuf<'_>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-        let shared_secret = cryptography_openssl::mlkem::decapsulate(
-            MlKemVariant::MlKem768,
-            &self.pkey,
-            ciphertext.as_bytes(),
-        )
-        .map_err(|_| pyo3::exceptions::PyValueError::new_err("Invalid ML-KEM-768 ciphertext"))?;
+        let shared_secret =
+            cryptography_openssl::mlkem::decapsulate(&self.pkey, ciphertext.as_bytes()).map_err(
+                |_| pyo3::exceptions::PyValueError::new_err("Invalid ML-KEM-768 ciphertext"),
+            )?;
         Ok(pyo3::types::PyBytes::new(py, &shared_secret))
     }
 
@@ -211,10 +209,10 @@ impl MlKem768PublicKey {
         &self,
         py: pyo3::Python<'p>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyTuple>> {
-        let (ciphertext, shared_secret) =
-            cryptography_openssl::mlkem::encapsulate(MlKemVariant::MlKem768, &self.pkey).map_err(
-                |_| pyo3::exceptions::PyValueError::new_err("ML-KEM-768 encapsulation failed"),
-            )?;
+        let (ciphertext, shared_secret) = cryptography_openssl::mlkem::encapsulate(&self.pkey)
+            .map_err(|_| {
+                pyo3::exceptions::PyValueError::new_err("ML-KEM-768 encapsulation failed")
+            })?;
         let ss = pyo3::types::PyBytes::new(py, &shared_secret);
         let ct = pyo3::types::PyBytes::new(py, &ciphertext);
         Ok(pyo3::types::PyTuple::new(py, [ss.as_any(), ct.as_any()])?)
