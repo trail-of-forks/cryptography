@@ -150,3 +150,15 @@ pub fn decapsulate(
     shared_secret.truncate(ss_len);
     Ok(shared_secret)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MlKemVariant;
+
+    #[test]
+    #[should_panic(expected = "Unsupported ML-KEM variant")]
+    fn test_from_pkey_wrong_type() {
+        let key = openssl::pkey::PKey::generate_ed25519().unwrap();
+        MlKemVariant::from_pkey(&key);
+    }
+}
