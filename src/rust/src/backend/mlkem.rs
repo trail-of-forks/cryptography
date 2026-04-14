@@ -8,8 +8,7 @@ use cryptography_openssl::mlkem::MlKemVariant;
 
 use crate::backend::utils;
 use crate::buf::CffiBuf;
-use crate::error::{CryptographyError, CryptographyResult};
-use crate::types;
+use crate::error::CryptographyResult;
 
 #[pyo3::pyclass(
     frozen,
@@ -18,7 +17,6 @@ use crate::types;
 )]
 pub(crate) struct MlKem768PrivateKey {
     pkey: openssl::pkey::PKey<openssl::pkey::Private>,
-    seed: [u8; 64],
 }
 
 #[pyo3::pyclass(
@@ -32,11 +30,9 @@ pub(crate) struct MlKem768PublicKey {
 
 pub(crate) fn mlkem768_private_key_from_pkey(
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
-    seed: [u8; 64],
 ) -> MlKem768PrivateKey {
     MlKem768PrivateKey {
         pkey: pkey.to_owned(),
-        seed,
     }
 }
 
@@ -52,18 +48,18 @@ pub(crate) fn mlkem768_public_key_from_pkey(
 fn generate_mlkem768_key() -> CryptographyResult<MlKem768PrivateKey> {
     let mut seed = [0u8; 64];
     cryptography_openssl::rand::rand_bytes(&mut seed)?;
-    let pkey = cryptography_openssl::mlkem::new_from_seed(MlKemVariant::MlKem768, &seed)?;
-    Ok(MlKem768PrivateKey { pkey, seed })
+    let pkey = cryptography_openssl::mlkem::new_raw_private_key(MlKemVariant::MlKem768, &seed)?;
+    Ok(MlKem768PrivateKey { pkey })
 }
 
 #[pyo3::pyfunction]
 fn from_mlkem768_seed_bytes(data: CffiBuf<'_>) -> pyo3::PyResult<MlKem768PrivateKey> {
-    let pkey = cryptography_openssl::mlkem::new_from_seed(MlKemVariant::MlKem768, data.as_bytes())
-        .map_err(|_| {
+    let pkey =
+        cryptography_openssl::mlkem::new_raw_private_key(MlKemVariant::MlKem768, data.as_bytes())
+            .map_err(|_| {
             pyo3::exceptions::PyValueError::new_err("An ML-KEM-768 seed is 64 bytes long")
         })?;
-    let seed: [u8; 64] = data.as_bytes().try_into().unwrap();
-    Ok(MlKem768PrivateKey { pkey, seed })
+    Ok(MlKem768PrivateKey { pkey })
 }
 
 #[pyo3::pymethods]
@@ -94,92 +90,37 @@ impl MlKem768PrivateKey {
         &self,
         py: pyo3::Python<'p>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-        Ok(pyo3::types::PyBytes::new(py, &self.seed))
+        let cryptography_key_parsing::pkcs8::MlKemPrivateKey::Seed(seed) =
+            cryptography_key_parsing::pkcs8::mlkem_seed_from_pkey(&self.pkey)?;
+        Ok(pyo3::types::PyBytes::new(py, &seed))
     }
 
     fn private_bytes<'p>(
-        &self,
+        slf: &pyo3::Bound<'p, Self>,
         py: pyo3::Python<'p>,
         encoding: crate::serialization::Encoding,
         format: crate::serialization::PrivateFormat,
         encryption_algorithm: &pyo3::Bound<'p, pyo3::PyAny>,
     ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
-        if !encryption_algorithm.is_instance(&types::KEY_SERIALIZATION_ENCRYPTION.get(py)?)? {
-            return Err(CryptographyError::from(
-                pyo3::exceptions::PyTypeError::new_err(
-                    "Encryption algorithm must be a KeySerializationEncryption instance",
-                ),
-            ));
-        }
-
+        // Intercept Raw/Raw/NoEncryption so we return the seed.
+        // The generic pkey_private_bytes raw path calls raw_private_key()
+        // which returns the expanded key on AWS-LC, not the seed.
         if encoding == crate::serialization::Encoding::Raw
-            || format == crate::serialization::PrivateFormat::Raw
+            && format == crate::serialization::PrivateFormat::Raw
+            && encryption_algorithm.is_instance(&crate::types::NO_ENCRYPTION.get(py)?)?
         {
-            if encoding != crate::serialization::Encoding::Raw
-                || format != crate::serialization::PrivateFormat::Raw
-                || !encryption_algorithm.is_instance(&types::NO_ENCRYPTION.get(py)?)?
-            {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "When using Raw both encoding and format must be Raw and encryption_algorithm must be NoEncryption()"
-                ).into());
-            }
-            return Ok(pyo3::types::PyBytes::new(py, &self.seed));
+            return slf.borrow().private_bytes_raw(py);
         }
-
-        if format != crate::serialization::PrivateFormat::PKCS8 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "ML-KEM-768 private keys only support PKCS8 and Raw formats",
-            )
-            .into());
-        }
-
-        let py_password;
-        let password = if encryption_algorithm.is_instance(&types::NO_ENCRYPTION.get(py)?)? {
-            b"" as &[u8]
-        } else if encryption_algorithm.is_instance(&types::BEST_AVAILABLE_ENCRYPTION.get(py)?)?
-            || (encryption_algorithm.is_instance(&types::ENCRYPTION_BUILDER.get(py)?)?
-                && encryption_algorithm
-                    .getattr(pyo3::intern!(py, "_format"))?
-                    .extract::<crate::serialization::PrivateFormat>()?
-                    == format)
-        {
-            py_password = encryption_algorithm
-                .getattr(pyo3::intern!(py, "password"))?
-                .extract::<pyo3::pybacked::PyBackedBytes>()?;
-            &py_password
-        } else {
-            return Err(CryptographyError::from(
-                pyo3::exceptions::PyValueError::new_err("Unsupported encryption type"),
-            ));
-        };
-
-        if password.len() > 1023 {
-            return Err(CryptographyError::from(
-                pyo3::exceptions::PyValueError::new_err(
-                    "Passwords longer than 1023 bytes are not supported by this backend",
-                ),
-            ));
-        }
-
-        let parsed = cryptography_key_parsing::ParsedPrivateKey::MlKem(
-            cryptography_openssl::mlkem::MlKemVariant::MlKem768,
-            self.seed,
-        );
-        let (tag, der_bytes) = if password.is_empty() {
-            (
-                "PRIVATE KEY",
-                cryptography_key_parsing::pkcs8::serialize_private_key(&parsed)?,
-            )
-        } else {
-            (
-                "ENCRYPTED PRIVATE KEY",
-                cryptography_key_parsing::pkcs8::serialize_encrypted_private_key(
-                    &parsed, password,
-                )?,
-            )
-        };
-
-        crate::asn1::encode_der_data(py, tag.to_string(), der_bytes, encoding)
+        utils::pkey_private_bytes(
+            py,
+            slf,
+            &slf.borrow().pkey,
+            encoding,
+            format,
+            encryption_algorithm,
+            true,
+            false,
+        )
     }
 
     fn __copy__(slf: pyo3::PyRef<'_, Self>) -> pyo3::PyRef<'_, Self> {

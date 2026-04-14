@@ -50,7 +50,7 @@ extern "C" {
     ) -> c_int;
 }
 
-pub fn new_from_seed(
+pub fn new_raw_private_key(
     variant: MlKemVariant,
     seed: &[u8],
 ) -> OpenSSLResult<openssl::pkey::PKey<openssl::pkey::Private>> {

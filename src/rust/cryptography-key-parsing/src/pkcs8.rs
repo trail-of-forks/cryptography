@@ -25,7 +25,7 @@ pub struct PrivateKeyInfo<'a> {
 // RFC 9935 Section 6
 #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
 #[derive(asn1::Asn1Read, asn1::Asn1Write)]
-enum MlKemPrivateKey {
+pub enum MlKemPrivateKey {
     #[implicit(0)]
     Seed([u8; 64]),
 }
@@ -36,6 +36,20 @@ enum MlKemPrivateKey {
 pub enum MlDsaPrivateKey {
     #[implicit(0)]
     Seed([u8; 32]),
+}
+
+/// Extract the ML-KEM seed from a private key.
+///
+/// AWS-LC's `raw_private_key()` returns the 2400-byte expanded key, not the seed.
+/// Since AWS-LC 1.72.0, `private_key_to_pkcs8()` produces RFC 9935 seed-format
+/// PKCS#8 when the key was created from a seed, so we round-trip through that.
+#[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+pub fn mlkem_seed_from_pkey(
+    pkey: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
+) -> Result<MlKemPrivateKey, openssl::error::ErrorStack> {
+    let pkcs8_der = pkey.private_key_to_pkcs8()?;
+    let pki = asn1::parse_single::<PrivateKeyInfo<'_>>(&pkcs8_der).unwrap();
+    Ok(asn1::parse_single::<MlKemPrivateKey>(pki.private_key).unwrap())
 }
 
 /// Extract the 32-byte ML-DSA-65 seed from a private key.
@@ -140,16 +154,14 @@ pub fn parse_private_key(data: &[u8]) -> KeyParsingResult<ParsedPrivateKey> {
             Ok(ParsedPrivateKey::Pkey(pkey))
         }
 
-        // ML-KEM is handled separately from PKey because AWS-LC's
-        // kem_priv_encode encodes the expanded private key (2,400 bytes)
-        // into PKCS#8. We serialize from the 64-byte seed instead.
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
         AlgorithmParameters::MlKem768 => {
             let MlKemPrivateKey::Seed(seed) = asn1::parse_single::<MlKemPrivateKey>(k.private_key)?;
-            Ok(ParsedPrivateKey::MlKem(
+            let pkey = cryptography_openssl::mlkem::new_raw_private_key(
                 cryptography_openssl::mlkem::MlKemVariant::MlKem768,
-                seed,
-            ))
+                &seed,
+            )?;
+            Ok(ParsedPrivateKey::Pkey(pkey))
         }
 
         #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
@@ -419,16 +431,6 @@ pub fn serialize_private_key(key: &ParsedPrivateKey) -> crate::KeySerializationR
     let q_bytes_dh;
 
     let (params, private_key_der) = match key {
-        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        ParsedPrivateKey::MlKem(variant, seed) => {
-            let private_key_der = asn1::write_single(&MlKemPrivateKey::Seed(*seed))?;
-            let params = match variant {
-                cryptography_openssl::mlkem::MlKemVariant::MlKem768 => {
-                    AlgorithmParameters::MlKem768
-                }
-            };
-            (params, private_key_der)
-        }
         ParsedPrivateKey::Pkey(pkey) => match pkey.id() {
             openssl::pkey::Id::RSA => {
                 let rsa = pkey.rsa()?;
@@ -527,6 +529,16 @@ pub fn serialize_private_key(key: &ParsedPrivateKey) -> crate::KeySerializationR
                     AlgorithmParameters::DhKeyAgreement(basic_params)
                 };
 
+                (params, private_key_der)
+            }
+            #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
+            cryptography_openssl::mlkem::PKEY_ID => {
+                let private_key_der = asn1::write_single(&mlkem_seed_from_pkey(pkey)?)?;
+                let params = match cryptography_openssl::mlkem::MlKemVariant::from_pkey(pkey) {
+                    cryptography_openssl::mlkem::MlKemVariant::MlKem768 => {
+                        AlgorithmParameters::MlKem768
+                    }
+                };
                 (params, private_key_der)
             }
             #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
