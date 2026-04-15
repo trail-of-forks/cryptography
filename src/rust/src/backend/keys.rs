@@ -190,8 +190,8 @@ fn private_key_from_pkey<'p>(
                 }
             }
         }
-        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        cryptography_openssl::mldsa::PKEY_ID => {
+        #[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+        id if cryptography_openssl::mldsa::is_mldsa_pkey_type(id) => {
             match cryptography_openssl::mldsa::MlDsaVariant::from_pkey(pkey) {
                 cryptography_openssl::mldsa::MlDsaVariant::MlDsa44 => {
                     Ok(crate::backend::mldsa::mldsa44_private_key_from_pkey(pkey)
@@ -376,8 +376,8 @@ fn public_key_from_pkey<'p>(
             }
         }
 
-        #[cfg(CRYPTOGRAPHY_IS_AWSLC)]
-        cryptography_openssl::mldsa::PKEY_ID => {
+        #[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+        id if cryptography_openssl::mldsa::is_mldsa_pkey_type(id) => {
             match cryptography_openssl::mldsa::MlDsaVariant::from_pkey(pkey) {
                 cryptography_openssl::mldsa::MlDsaVariant::MlDsa44 => {
                     Ok(crate::backend::mldsa::mldsa44_public_key_from_pkey(pkey)
