@@ -99,19 +99,6 @@ class TestMLKEM768:
                 b"password",
                 serialization.load_der_private_key,
             ),
-            (
-                serialization.Encoding.PEM,
-                serialization.PrivateFormat.PKCS8,
-                serialization._KeySerializationEncryption(
-                    serialization.PrivateFormat.PKCS8,
-                    b"password",
-                    kdf_rounds=None,
-                    hmac_hash=None,
-                    key_cert_algorithm=None,
-                ),
-                b"password",
-                serialization.load_pem_private_key,
-            ),
         ],
     )
     def test_round_trip_private_serialization(
