@@ -181,32 +181,33 @@ class TestMLKEM768:
         )
         assert serialized_der == kat_der
 
-    def test_kat_vectors(self, backend):
+    def test_kat_vectors(self, subtests, backend):
         vectors = load_vectors_from_file(
             os.path.join("asymmetric", "MLKEM", "kat_MLKEM_768.rsp"),
             load_nist_vectors,
         )
         for vector in vectors:
-            d = binascii.unhexlify(vector["d"])
-            z = binascii.unhexlify(vector["z"])
+            with subtests.test():
+                d = binascii.unhexlify(vector["d"])
+                z = binascii.unhexlify(vector["z"])
 
-            seed = d + z
-            key = MLKEM768PrivateKey.from_seed_bytes(seed)
-            assert key.private_bytes_raw() == seed
+                seed = d + z
+                key = MLKEM768PrivateKey.from_seed_bytes(seed)
+                assert key.private_bytes_raw() == seed
 
-            # Verify public key matches
-            pub = key.public_key()
-            assert pub.public_bytes_raw() == binascii.unhexlify(vector["pk"])
+                # Verify public key matches
+                pub = key.public_key()
+                assert pub.public_bytes_raw() == binascii.unhexlify(vector["pk"])
 
-            # Verify decapsulation produces the expected shared secret
-            ss = key.decapsulate(binascii.unhexlify(vector["ct"]))
-            assert ss == binascii.unhexlify(vector["ss"])
+                # Verify decapsulation produces the expected shared secret
+                ss = key.decapsulate(binascii.unhexlify(vector["ct"]))
+                assert ss == binascii.unhexlify(vector["ss"])
 
-            # Decapsulating an invalid ciphertext should use
-            # implicit rejection, producing a deterministic but
-            # different shared secret.
-            ss_n = key.decapsulate(binascii.unhexlify(vector["ct_n"]))
-            assert ss_n == binascii.unhexlify(vector["ss_n"])
+                # Decapsulating an invalid ciphertext should use
+                # implicit rejection, producing a deterministic but
+                # different shared secret.
+                ss_n = key.decapsulate(binascii.unhexlify(vector["ct_n"]))
+                assert ss_n == binascii.unhexlify(vector["ss_n"])
 
     @pytest.mark.parametrize(
         ("encoding", "fmt", "encryption", "err"),

@@ -136,11 +136,14 @@ impl MlKem768PrivateKey {
 }
 
 #[pyo3::pyfunction]
-fn from_mlkem768_public_bytes(data: &[u8]) -> pyo3::PyResult<MlKem768PublicKey> {
-    let pkey = cryptography_openssl::mlkem::new_raw_public_key(MlKemVariant::MlKem768, data)
-        .map_err(|_| {
-            pyo3::exceptions::PyValueError::new_err("An ML-KEM-768 public key is 1184 bytes long")
-        })?;
+fn from_mlkem768_public_bytes(data: CffiBuf<'_>) -> pyo3::PyResult<MlKem768PublicKey> {
+    let pkey =
+        cryptography_openssl::mlkem::new_raw_public_key(MlKemVariant::MlKem768, data.as_bytes())
+            .map_err(|_| {
+                pyo3::exceptions::PyValueError::new_err(
+                    "An ML-KEM-768 public key is 1184 bytes long",
+                )
+            })?;
     Ok(MlKem768PublicKey { pkey })
 }
 
