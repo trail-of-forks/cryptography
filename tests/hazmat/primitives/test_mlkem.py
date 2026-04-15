@@ -197,7 +197,9 @@ class TestMLKEM768:
 
                 # Verify public key matches
                 pub = key.public_key()
-                assert pub.public_bytes_raw() == binascii.unhexlify(vector["pk"])
+                assert pub.public_bytes_raw() == binascii.unhexlify(
+                    vector["pk"]
+                )
 
                 # Verify decapsulation produces the expected shared secret
                 ss = key.decapsulate(binascii.unhexlify(vector["ct"]))
