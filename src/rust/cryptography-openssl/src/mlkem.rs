@@ -133,10 +133,11 @@ pub fn decapsulate(
 ) -> OpenSSLResult<Vec<u8>> {
     let ctx = openssl::pkey_ctx::PkeyCtx::new(pkey)?;
 
-    let mut ss_len: usize = match MlKemVariant::from_pkey(pkey) {
+    let ss_bytes: usize = match MlKemVariant::from_pkey(pkey) {
         MlKemVariant::MlKem768 => 32,
     };
-    let mut shared_secret = vec![0u8; ss_len];
+    let mut shared_secret = vec![0u8; ss_bytes];
+    let mut ss_len = ss_bytes;
     // SAFETY: ctx is a valid EVP_PKEY_CTX, buffers are correctly sized.
     unsafe {
         cvt(ffi::EVP_PKEY_decapsulate(
@@ -147,7 +148,7 @@ pub fn decapsulate(
             ciphertext.len(),
         ))?;
     }
-    shared_secret.truncate(ss_len);
+    assert_eq!(ss_len, ss_bytes);
     Ok(shared_secret)
 }
 
