@@ -21,6 +21,10 @@ pub(crate) mod hmac;
 pub(crate) mod hpke;
 pub(crate) mod kdf;
 pub(crate) mod keys;
+#[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+pub(crate) mod mldsa;
+#[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+pub(crate) mod mlkem;
 pub(crate) mod poly1305;
 pub(crate) mod rand;
 pub(crate) mod rsa;

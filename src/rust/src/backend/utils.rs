@@ -173,8 +173,22 @@ pub(crate) fn pkey_private_bytes<'p>(
     let password = &*password;
 
     if format == PrivateFormat::PKCS8 {
-        let pkcs8_der = cryptography_key_parsing::pkcs8::serialize_private_key(pkey)?;
-        return encode_pkcs8_der(py, pkcs8_der, password, encoding);
+        let parsed = cryptography_key_parsing::ParsedPrivateKey::Pkey(pkey.to_owned());
+        let (tag, der_bytes) = if password.is_empty() {
+            (
+                "PRIVATE KEY",
+                cryptography_key_parsing::pkcs8::serialize_private_key(&parsed)?,
+            )
+        } else {
+            (
+                "ENCRYPTED PRIVATE KEY",
+                cryptography_key_parsing::pkcs8::serialize_encrypted_private_key(
+                    &parsed, password,
+                )?,
+            )
+        };
+
+        return crate::asn1::encode_der_data(py, tag.to_string(), der_bytes, encoding);
     }
 
     if format == PrivateFormat::TraditionalOpenSSL {

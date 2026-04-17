@@ -89,6 +89,20 @@ Changelog
   method for computing hashes.
 * Added :doc:`/hazmat/primitives/hpke` support implementing :rfc:`9180` for
   hybrid authenticated encryption.
+* Added new :doc:`/hazmat/primitives/asymmetric/mldsa` module with
+  support for ML-DSA signing and verification with AWS-LC and BoringSSL.
+* Added new :doc:`/hazmat/asn1/index` module with support for declaratively
+  defining custom ASN.1 types and encoding/decoding them.
+
+.. v46-0-7:
+
+46.0.7 - 2026-04-07
+~~~~~~~~~~~~~~~~~~~
+
+* **SECURITY ISSUE**: Fixed an issue where non-contiguous buffers could be
+  passed to APIs that accept Python buffers, which could lead to buffer
+  overflow. **CVE-2026-39892**
+* Updated Windows, macOS, and Linux wheels to be compiled with OpenSSL 3.5.6.
 
 .. _v46-0-6:
 

@@ -33,7 +33,12 @@ pub(crate) fn load_der_private_key_bytes<'p>(
     password: Option<&[u8]>,
     unsafe_skip_rsa_key_validation: bool,
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::PyAny>> {
-    let parsers: [cryptography_key_parsing::PrivateKeyParser; 4] = [
+    type Parser = fn(
+        &[u8],
+    ) -> cryptography_key_parsing::KeyParsingResult<
+        cryptography_key_parsing::ParsedPrivateKey,
+    >;
+    let parsers: [Parser; 4] = [
         cryptography_key_parsing::pkcs8::parse_private_key,
         |d| {
             cryptography_key_parsing::ec::parse_pkcs1_private_key(d, None)
@@ -173,6 +178,41 @@ fn private_key_from_pkey<'p>(
         openssl::pkey::Id::DHX => Ok(crate::backend::dh::private_key_from_pkey(pkey)
             .into_pyobject(py)?
             .into_any()),
+        #[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+        id if cryptography_openssl::mlkem::is_mlkem_pkey_type(id) => {
+            match cryptography_openssl::mlkem::MlKemVariant::from_pkey(pkey) {
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768 => {
+                    Ok(crate::backend::mlkem::mlkem768_private_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+                cryptography_openssl::mlkem::MlKemVariant::MlKem1024 => {
+                    Ok(crate::backend::mlkem::mlkem1024_private_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+            }
+        }
+        #[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+        id if cryptography_openssl::mldsa::is_mldsa_pkey_type(id) => {
+            match cryptography_openssl::mldsa::MlDsaVariant::from_pkey(pkey) {
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa44 => {
+                    Ok(crate::backend::mldsa::mldsa44_private_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa65 => {
+                    Ok(crate::backend::mldsa::mldsa65_private_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa87 => {
+                    Ok(crate::backend::mldsa::mldsa87_private_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+            }
+        }
         _ => Err(CryptographyError::from(
             exceptions::UnsupportedAlgorithm::new_err("Unsupported key type."),
         )),
@@ -213,6 +253,7 @@ fn public_key_from_parsed<'p>(
         }
     }
 }
+
 
 #[pyo3::pyfunction]
 #[pyo3(signature = (data, backend=None))]
@@ -340,7 +381,42 @@ fn public_key_from_pkey<'p>(
         openssl::pkey::Id::DHX => Ok(crate::backend::dh::public_key_from_pkey(pkey)
             .into_pyobject(py)?
             .into_any()),
+        #[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+        id if cryptography_openssl::mlkem::is_mlkem_pkey_type(id) => {
+            match cryptography_openssl::mlkem::MlKemVariant::from_pkey(pkey) {
+                cryptography_openssl::mlkem::MlKemVariant::MlKem768 => {
+                    Ok(crate::backend::mlkem::mlkem768_public_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+                cryptography_openssl::mlkem::MlKemVariant::MlKem1024 => {
+                    Ok(crate::backend::mlkem::mlkem1024_public_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+            }
+        }
 
+        #[cfg(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC))]
+        id if cryptography_openssl::mldsa::is_mldsa_pkey_type(id) => {
+            match cryptography_openssl::mldsa::MlDsaVariant::from_pkey(pkey) {
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa44 => {
+                    Ok(crate::backend::mldsa::mldsa44_public_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa65 => {
+                    Ok(crate::backend::mldsa::mldsa65_public_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+                cryptography_openssl::mldsa::MlDsaVariant::MlDsa87 => {
+                    Ok(crate::backend::mldsa::mldsa87_public_key_from_pkey(pkey)
+                        .into_pyobject(py)?
+                        .into_any())
+                }
+            }
+        }
         _ => Err(CryptographyError::from(
             exceptions::UnsupportedAlgorithm::new_err("Unsupported key type."),
         )),

@@ -53,6 +53,13 @@ pub enum AlgorithmParameters<'a> {
     #[defined_by(oid::ED448_OID)]
     Ed448,
 
+    #[defined_by(oid::ML_DSA_44_OID)]
+    MlDsa44,
+    #[defined_by(oid::ML_DSA_65_OID)]
+    MlDsa65,
+    #[defined_by(oid::ML_DSA_87_OID)]
+    MlDsa87,
+
     #[defined_by(oid::X25519_OID)]
     X25519,
     #[defined_by(oid::X448_OID)]
@@ -60,6 +67,12 @@ pub enum AlgorithmParameters<'a> {
 
     #[defined_by(oid::SLH_DSA_SHAKE_256F_OID)]
     SlhDsaShake256f,
+
+    #[defined_by(oid::ML_KEM_768_OID)]
+    MlKem768,
+    #[defined_by(oid::ML_KEM_1024_OID)]
+    MlKem1024,
+
 
     // These encodings are only used in SPKI AlgorithmIdentifiers.
     #[defined_by(oid::EC_OID)]
