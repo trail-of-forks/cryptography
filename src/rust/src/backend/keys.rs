@@ -254,7 +254,6 @@ fn public_key_from_parsed<'p>(
     }
 }
 
-
 #[pyo3::pyfunction]
 #[pyo3(signature = (data, backend=None))]
 fn load_der_public_key<'p>(

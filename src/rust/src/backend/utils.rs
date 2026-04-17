@@ -129,6 +129,7 @@ fn extract_password_from_encryption_algorithm(
 
 /// Encode PKCS8 DER bytes with optional encryption, then encode to the
 /// requested format (DER or PEM).
+#[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
 pub(crate) fn encode_pkcs8_der<'p>(
     py: pyo3::Python<'p>,
     pkcs8_der: Vec<u8>,

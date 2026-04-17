@@ -119,7 +119,6 @@ pub const ML_DSA_87_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101,
 pub const ML_KEM_768_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 4, 2);
 pub const ML_KEM_1024_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 4, 3);
 
-
 // Hashes
 pub const SHA1_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 14, 3, 2, 26);
 pub const SHA224_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 2, 4);

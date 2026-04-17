@@ -580,6 +580,11 @@ pub fn serialize_private_key(key: &ParsedPrivateKey) -> crate::KeySerializationR
                 unimplemented!("Unknown key type");
             }
         },
+        #[cfg(CRYPTOGRAPHY_IS_BORINGSSL)]
+        ParsedPrivateKey::SlhDsaShake256f(key_bytes) => {
+            let private_key_der = asn1::write_single(&key_bytes.as_slice())?;
+            (AlgorithmParameters::SlhDsaShake256f, private_key_der)
+        }
     };
 
     let pki = PrivateKeyInfo {
