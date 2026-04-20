@@ -93,6 +93,16 @@ specifying auxiliary authenticated information.
 
         DHKEM(P-521, HKDF-SHA512)
 
+    .. attribute:: MLKEM768
+
+        ML-KEM-768. Post-quantum secure. Only available on backends that
+        support ML-KEM.
+
+    .. attribute:: MLKEM1024
+
+        ML-KEM-1024. Post-quantum secure. Only available on backends that
+        support ML-KEM.
+
 .. class:: KDF
 
     An enumeration of key derivation functions.
