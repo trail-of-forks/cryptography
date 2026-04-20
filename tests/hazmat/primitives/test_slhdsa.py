@@ -179,6 +179,26 @@ class TestSlhDsaShake256f:
                     assert private_key.private_bytes_raw() == sk
                     assert private_key.public_key().public_bytes_raw() == pk
 
+    def test_siggen_vectors(self, backend, subtests):
+        vectors = load_vectors_from_file(
+            os.path.join("asymmetric", "SLHDSA", "siggen.json"),
+            lambda f: json.load(f),
+        )
+        for group in vectors["testGroups"]:
+            if group["parameterSet"] != "SLH-DSA-SHAKE-256f":
+                continue
+            for test in group["tests"]:
+                with subtests.test():
+                    sk = binascii.unhexlify(test["sk"])
+                    msg = binascii.unhexlify(test["message"])
+                    ctx = binascii.unhexlify(test["context"])
+
+                    private_key = SlhDsaShake256fPrivateKey.from_private_bytes(sk)
+                    sig = private_key.sign(msg, ctx if ctx else None)
+                    private_key.public_key().verify(
+                        sig, msg, ctx if ctx else None
+                    )
+
     def test_sigver_vectors(self, backend, subtests):
         vectors = load_vectors_from_file(
             os.path.join("asymmetric", "SLHDSA", "sigver.json"),
