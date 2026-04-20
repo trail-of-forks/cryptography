@@ -190,14 +190,18 @@ class TestSlhDsaShake256f:
             for test in group["tests"]:
                 with subtests.test():
                     sk = binascii.unhexlify(test["sk"])
+                    pk = binascii.unhexlify(test["pk"])
                     msg = binascii.unhexlify(test["message"])
                     ctx = binascii.unhexlify(test["context"])
+                    sig = binascii.unhexlify(test["signature"])
 
-                    private_key = SlhDsaShake256fPrivateKey.from_private_bytes(sk)
-                    sig = private_key.sign(msg, ctx if ctx else None)
-                    private_key.public_key().verify(
-                        sig, msg, ctx if ctx else None
+                    private_key = SlhDsaShake256fPrivateKey.from_private_bytes(
+                        sk
                     )
+                    assert private_key.public_key().public_bytes_raw() == pk
+
+                    pub = SlhDsaShake256fPublicKey.from_public_bytes(pk)
+                    pub.verify(sig, msg, ctx if ctx else None)
 
     def test_sigver_vectors(self, backend, subtests):
         vectors = load_vectors_from_file(
