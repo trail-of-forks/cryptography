@@ -22,6 +22,7 @@ from cryptography.hazmat.bindings._rust.openssl import (
     mlkem,
     poly1305,
     rsa,
+    slhdsa,
     x448,
     x25519,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "poly1305",
     "raise_openssl_error",
     "rsa",
+    "slhdsa",
     "x448",
     "x25519",
 ]

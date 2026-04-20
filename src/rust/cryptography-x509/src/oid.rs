@@ -109,6 +109,9 @@ pub const X448_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 101, 111);
 pub const ED25519_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 101, 112);
 pub const ED448_OID: asn1::ObjectIdentifier = asn1::oid!(1, 3, 101, 113);
 
+pub const SLH_DSA_SHAKE_256F_OID: asn1::ObjectIdentifier =
+    asn1::oid!(2, 16, 840, 1, 101, 3, 4, 3, 25);
+
 pub const ML_DSA_44_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 3, 17);
 pub const ML_DSA_65_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 3, 18);
 pub const ML_DSA_87_OID: asn1::ObjectIdentifier = asn1::oid!(2, 16, 840, 1, 101, 3, 4, 3, 19);
