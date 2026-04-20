@@ -66,13 +66,13 @@ Asymmetric ciphers
   RustCrypto using scrypt as the KDF. The password is ``hunter42``.
 * FIPS 203 ML-KEM-{512,768,1024} KAT vectors from `post-quantum-cryptography/KAT`_.
 * FIPS 204 ML-DSA-{44,65,87} KAT vectors from `post-quantum-cryptography/KAT`_.
-* FIPS 205 SLH-DSA keyGen, sigGen, and sigVer vectors from `NIST ACVP-Server`_.
+* FIPS 205 SLH-DSA vectors from `NIST ACVP-Server`_.
   Filtered from the full upstream data:
 
   - Only SLH-DSA-SHA2-128s and SLH-DSA-SHAKE-256f parameter sets are kept.
-  - sigGen: only ``deterministic=false``, pure, external-interface vectors are
+  - Signature Generation: only ``deterministic=false``, pure, external-interface vectors are
     kept.
-  - sigVer: only pure, external-interface vectors are kept.
+  - Signature Verification: only pure, external-interface vectors are kept.
 
 Custom asymmetric vectors
 ~~~~~~~~~~~~~~~~~~~~~~~~~
