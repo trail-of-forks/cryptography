@@ -3,6 +3,7 @@
 // for complete details.
 
 use cryptography_x509::certificate::Certificate;
+use cryptography_x509::crl::CertificateRevocationList;
 use cryptography_x509::extensions::SubjectAlternativeName;
 use cryptography_x509::oid::SUBJECT_ALTERNATIVE_NAME_OID;
 use cryptography_x509_verification::ops::{CryptoOps, VerificationCertificate};
@@ -36,6 +37,22 @@ impl CryptoOps for PyCryptoOps {
     fn public_key(&self, cert: &Certificate<'_>) -> Result<Self::Key, Self::Err> {
         pyo3::Python::attach(|py| -> Result<Self::Key, Self::Err> {
             Ok(keys::load_der_public_key_bytes(py, cert.tbs_cert.spki.tlv().full_data())?.unbind())
+        })
+    }
+
+    fn verify_crl_signed_by(
+        &self,
+        crl: &CertificateRevocationList<'_>,
+        key: &Self::Key,
+    ) -> Result<(), Self::Err> {
+        pyo3::Python::attach(|py| -> CryptographyResult<()> {
+            sign::verify_signature_with_signature_algorithm(
+                py,
+                key.bind(py).clone(),
+                &crl.signature_algorithm,
+                crl.signature_value.as_bytes(),
+                &asn1::write_single(&crl.tbs_cert_list)?,
+            )
         })
     }
 
