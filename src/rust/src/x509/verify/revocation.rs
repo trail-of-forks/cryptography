@@ -5,11 +5,11 @@ use cryptography_x509_verification::{
     ValidationError, ValidationErrorKind, ValidationResult,
 };
 
-use crate::x509::{crl::CertificateRevocationList, verify::PyCryptoOps};
+use crate::x509::{certificate::Certificate, crl::CertificateRevocationList, verify::PyCryptoOps};
 
 self_cell::self_cell!(
     pub(crate) struct RawPyCrlRevocationChecker {
-        owner: Vec<pyo3::Py<CertificateRevocationList>>,
+        owner: Vec<(pyo3::Py<Certificate>, pyo3::Py<CertificateRevocationList>)>,
 
         #[covariant]
         dependent: CrlRevocationChecker,
@@ -30,22 +30,26 @@ pub(crate) struct PyCrlRevocationChecker {
 impl PyCrlRevocationChecker {
     #[new]
     fn new(
-        crls: Vec<pyo3::Py<CertificateRevocationList>>,
+        issuers_to_crls: Vec<(pyo3::Py<Certificate>, pyo3::Py<CertificateRevocationList>)>,
     ) -> pyo3::PyResult<(Self, PyRevocationChecker)> {
-        if crls.is_empty() {
+        if issuers_to_crls.is_empty() {
             return Err(pyo3::exceptions::PyValueError::new_err(
                 "can't create an empty CRL revocation checker",
             ));
         }
-
-        Ok((
-            Self {
-                raw: RawPyCrlRevocationChecker::new(crls, |v| {
-                    CrlRevocationChecker::new(v.iter().map(|i| i.get().owned.borrow_dependent()))
+ 
+        let raw = RawPyCrlRevocationChecker::new(issuers_to_crls, |v| {
+            CrlRevocationChecker::new(
+                PyCryptoOps {},
+                v.iter().map(|i| {
+                    (
+                        i.0.get().raw.borrow_dependent(),
+                        i.1.get().owned.borrow_dependent(),
+                    )
                 }),
-            },
-            PyRevocationChecker {},
-        ))
+            )
+        });
+        Ok((Self { raw }, PyRevocationChecker {}))
     }
 }
 

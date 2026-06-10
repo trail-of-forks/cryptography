@@ -2,7 +2,9 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use cryptography_x509::crl::CertificateRevocationList;
+use std::collections::HashMap;
+
+use cryptography_x509::{certificate::Certificate, crl::CertificateRevocationList, name::Name};
 
 use crate::{
     ops::{CryptoOps, VerificationCertificate},
@@ -20,7 +22,7 @@ pub trait CheckRevocation<B: CryptoOps> {
 }
 
 pub struct CrlRevocationChecker<'a> {
-    crls: Vec<&'a CertificateRevocationList<'a>>,
+    by_issuer: HashMap<Name<'a>, &'a CertificateRevocationList<'a>>,
 }
 
 impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
@@ -30,7 +32,7 @@ impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
         issuer: &VerificationCertificate<'chain, B>,
         policy: &Policy<'_, B>,
     ) -> ValidationResult<'chain, bool, B> {
-        let _crls = &self.crls;
+        let _crls = &self.by_issuer;
         let _cert = cert;
         let _issuer = issuer;
         let _policy = policy;
@@ -42,9 +44,13 @@ impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
 }
 
 impl<'a> CrlRevocationChecker<'a> {
-    pub fn new(crls: impl IntoIterator<Item = &'a CertificateRevocationList<'a>>) -> Self {
+    /// Constructs a new revocation checker.
+    pub fn new<B: CryptoOps>(
+        _ops: B,
+        _crls: impl IntoIterator<Item = (&'a Certificate<'a>, &'a CertificateRevocationList<'a>)>,
+    ) -> Self {
         Self {
-            crls: crls.into_iter().collect(),
+            by_issuer: HashMap::new(),
         }
     }
 }

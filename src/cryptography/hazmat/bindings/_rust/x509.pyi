@@ -286,7 +286,10 @@ class ExtensionPolicy:
 class RevocationChecker: ...
 
 class CRLRevocationChecker:
-    def __init__(self, crls: list[x509.CertificateRevocationList]) -> None: ...
+    def __init__(
+        self,
+        crls: list[tuple[x509.Certificate, x509.CertificateRevocationList]],
+    ) -> None: ...
 
 class VerifiedClient:
     @property

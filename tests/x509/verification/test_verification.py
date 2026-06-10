@@ -217,6 +217,10 @@ class TestClientVerifier:
             os.path.join("x509", "custom", "crl_empty.pem"),
             x509.load_pem_x509_crl,
         )
+        crl_issuer = _load_cert(
+            os.path.join("x509", "custom", "ca", "ca.pem"),
+            x509.load_pem_x509_certificate,
+        )
         store = Store([ca])
 
         validation_time = datetime.datetime.fromisoformat(
@@ -224,7 +228,9 @@ class TestClientVerifier:
         )
 
         builder = PolicyBuilder().store(store).time(validation_time)
-        builder = builder.revocation_checker(CRLRevocationChecker([crl]))
+        builder = builder.revocation_checker(
+            CRLRevocationChecker([(crl_issuer, crl)])
+        )
         verifier = builder.build_client_verifier()
 
         with pytest.raises(VerificationError, match="unimplemented"):
