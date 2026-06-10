@@ -16,6 +16,10 @@ self_cell::self_cell!(
     }
 );
 
+/// A class that can be used to construct a [`CrlRevocationChecker`].
+///
+/// It holds the [`CertificateRevocationList`] entries that comprise a [`CrlRevocationChecker`] and
+/// constructs an instance that borrows against them.
 #[pyo3::pyclass(
     frozen,
     module = "cryptography.hazmat.bindings._rust.x509",
@@ -37,7 +41,7 @@ impl PyCrlRevocationChecker {
                 "can't create an empty CRL revocation checker",
             ));
         }
- 
+
         let raw = RawPyCrlRevocationChecker::new(issuers_to_crls, |v| {
             CrlRevocationChecker::new(
                 PyCryptoOps {},
@@ -53,6 +57,7 @@ impl PyCrlRevocationChecker {
     }
 }
 
+/// A marker class that Rust and Python revocation checkers subclass from.
 // NO-COVERAGE-START
 #[pyo3::pyclass(
     subclass,
@@ -61,7 +66,6 @@ impl PyCrlRevocationChecker {
     name = "RevocationChecker"
 )]
 // NO-COVERAGE-END
-/// A marker class that Rust and Python revocation checkers subclass from.
 pub(crate) struct PyRevocationChecker;
 
 #[pyo3::pymethods]
@@ -73,6 +77,8 @@ impl PyRevocationChecker {
     }
 }
 
+/// An implementation of a [`cryptography-x509-verification`] revocation checker that bridges to a
+/// Python class.
 impl CheckRevocation<PyCryptoOps> for pyo3::Py<PyRevocationChecker> {
     fn is_revoked<'chain>(
         &self,
@@ -87,23 +93,18 @@ impl CheckRevocation<PyCryptoOps> for pyo3::Py<PyRevocationChecker> {
                     pyo3::intern!(py, "is_revoked"),
                     (cert.extra(), issuer.extra(), &policy.extra),
                 )
-                .map_err(|_e| {
-                    ValidationError::new(ValidationErrorKind::FatalError::<PyCryptoOps>(
-                        "the revocation checker raised an exception",
-                    ))
+                .map_err(|e| {
+                    ValidationError::new(
+                        ValidationErrorKind::RevocationNotDetermined::<PyCryptoOps>(e.to_string()),
+                    )
                 })?;
 
-            if result.is_none(py) {
-                Err(ValidationError::new(
-                    ValidationErrorKind::RevocationNotDetermined,
+            result.extract(py).map_err(|_e| {
+                ValidationError::new(ValidationErrorKind::RevocationNotDetermined::<PyCryptoOps>(
+                    "the revocation checker must return True or False or throw an exception"
+                        .to_owned(),
                 ))
-            } else {
-                result.extract(py).map_err(|_e| {
-                    ValidationError::new(ValidationErrorKind::FatalError::<PyCryptoOps>(
-                        "the revocation checker must return one of True, False, or None",
-                    ))
-                })
-            }
+            })
         })
     }
 }

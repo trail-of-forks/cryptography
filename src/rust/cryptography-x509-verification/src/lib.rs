@@ -46,7 +46,7 @@ pub enum ValidationErrorKind<'chain, B: CryptoOps> {
         reason: &'static str,
     },
     FatalError(&'static str),
-    RevocationNotDetermined,
+    RevocationNotDetermined(String),
     Other(String),
 }
 
@@ -98,8 +98,8 @@ impl<B: CryptoOps> Display for ValidationError<'_, B> {
                 write!(f, "invalid extension: {oid}: {reason}")
             }
             ValidationErrorKind::FatalError(err) => write!(f, "fatal error: {err}"),
-            ValidationErrorKind::RevocationNotDetermined => {
-                write!(f, "unable to determine revocation status")
+            ValidationErrorKind::RevocationNotDetermined(reason) => {
+                write!(f, "unable to determine revocation status: {reason}")
             }
             ValidationErrorKind::Other(err) => write!(f, "{err}"),
         }
@@ -506,6 +506,9 @@ impl<'a, 'chain, B: CryptoOps> ChainBuilder<'a, 'chain, B> {
                     ) {
                         Ok(mut chain) => {
                             if let Some(revocation_checker) = self.revocation_checker {
+                                // NOTE(tnytown): We propagate the error from the revocation checker
+                                // here; if it runs into an issue we want to provide visibility and
+                                // fail closed.
                                 if revocation_checker.is_revoked(
                                     working_cert,
                                     issuing_cert_candidate,
@@ -588,6 +591,7 @@ impl<'a, 'chain, B: CryptoOps> ChainBuilder<'a, 'chain, B> {
 mod tests {
     use asn1::ParseError;
     use cryptography_x509::certificate::Certificate;
+    use cryptography_x509::crl::CertificateRevocationList;
     use cryptography_x509::oid::SUBJECT_ALTERNATIVE_NAME_OID;
 
     use crate::certificate::tests::PublicKeyErrorOps;
@@ -613,9 +617,13 @@ mod tests {
             "invalid extension: 2.5.29.17: duplicate extension"
         );
 
-        let err =
-            ValidationError::<PublicKeyErrorOps>::new(ValidationErrorKind::RevocationNotDetermined);
-        assert_eq!(err.to_string(), "unable to determine revocation status");
+        let err = ValidationError::<PublicKeyErrorOps>::new(
+            ValidationErrorKind::RevocationNotDetermined("oops".to_owned()),
+        );
+        assert_eq!(
+            err.to_string(),
+            "unable to determine revocation status: oops"
+        );
 
         let err =
             ValidationError::<PublicKeyErrorOps>::new(ValidationErrorKind::FatalError("oops"));
@@ -634,6 +642,14 @@ mod tests {
         type PolicyExtra = ();
 
         fn public_key(&self, _cert: &Certificate<'_>) -> Result<Self::Key, Self::Err> {
+            Ok(())
+        }
+
+        fn verify_crl_signed_by(
+            &self,
+            _crl: &CertificateRevocationList<'_>,
+            _key: &Self::Key,
+        ) -> Result<(), Self::Err> {
             Ok(())
         }
 
@@ -701,7 +717,7 @@ qolIOwIgCaIgj9ipK0Q0p+45UJiq+L/ncrxsweJkFq/UYubzhX0=
             PolicyDefinition::server(NullOps, subject, time, Some(u8::MAX), None, None).unwrap();
         let policy = Policy::new(&policy_def, ());
 
-        let builder = ChainBuilder::new(&intermediates, &policy, &store);
+        let builder = ChainBuilder::new(&intermediates, &policy, None, &store);
         let mut budget = Budget {
             name_constraint_checks: usize::MAX,
             signature_checks: usize::MAX,
