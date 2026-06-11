@@ -42,7 +42,7 @@ impl PyCrlRevocationChecker {
             ));
         }
 
-        let raw = RawPyCrlRevocationChecker::new(issuers_to_crls, |v| {
+        let raw = RawPyCrlRevocationChecker::try_new(issuers_to_crls, |v| {
             CrlRevocationChecker::new(
                 PyCryptoOps {},
                 v.iter().map(|i| {
@@ -52,7 +52,12 @@ impl PyCrlRevocationChecker {
                     )
                 }),
             )
-        });
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(
+                    "Failed to process CRLs. Ensure that CRLs and issuers match",
+                )
+            })
+        })?;
         Ok((Self { raw }, PyRevocationChecker {}))
     }
 }

@@ -586,15 +586,6 @@ impl<'a, B: CryptoOps> Policy<'a, B> {
         &self,
         crl: &CertificateRevocationList<'_>,
     ) -> ValidationResult<'chain, (), B> {
-        // 5280 5: CRLs MUST be version 2. 5280 also REQUIRES version 1 CRL support for
-        //      conforming applications, but they are functionally obsolete in the profiles
-        //      that we care about at the moment.
-        if crl.tbs_cert_list.version != Some(1) {
-            return Err(ValidationError::new(ValidationErrorKind::Other(
-                "CRL must be a version 2 CRL".to_string(),
-            )));
-        }
-
         let this_update = crl.tbs_cert_list.this_update.as_datetime();
         permits_validity_date(&crl.tbs_cert_list.this_update)?;
 
@@ -615,16 +606,6 @@ impl<'a, B: CryptoOps> Policy<'a, B> {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn valid_crl_issuer<'chain>(
-        &self,
-        issuer: &VerificationCertificate<'chain, B>,
-        crl: &CertificateRevocationList<'_>,
-    ) -> ValidationResult<'chain, (), B> {
-        self.permits_crl(crl)?;
-
-        todo!()
     }
 }
 

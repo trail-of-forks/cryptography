@@ -9,10 +9,11 @@ use cryptography_x509::{
     common::Asn1Read,
     crl::{CertificateRevocationList, IssuingDistributionPoint},
     extensions::{
-        BasicConstraints, DistributionPoint, DistributionPointName, SequenceOfDistributionPoints,
+        BasicConstraints, DistributionPoint, DistributionPointName, KeyUsage,
+        SequenceOfDistributionPoints,
     },
     name::{GeneralName, Name},
-    oid::{BASIC_CONSTRAINTS_OID, CRL_DISTRIBUTION_POINTS_OID, ISSUING_DISTRIBUTION_POINT_OID},
+    oid,
 };
 
 use crate::{
@@ -52,7 +53,7 @@ fn crl_distribution_point_matches(
         })
         .collect();
 
-    // Check that a name in one of the cert's DPs matches one of the names in the IDP.
+    // Check that a name in one of the cert's DPs matches one of the names in the iDP.
     for dp in cert_dps {
         // XX(tnytown): shouldn't be necessary, but rust-analyzer can't infer the type without?
         let _: &DistributionPoint<'_, Asn1Read> = &dp;
@@ -77,31 +78,32 @@ fn crl_distribution_point_matches(
 }
 
 /// Verifies that the scope of the CRL matches the certificate.
-///
-/// This maps to step (b) in [RFC 5280 6.3.3].
-/// [RFC 5280 6.3.3]: https://datatracker.ietf.org/doc/html/rfc5280#section-6.3.3
 fn verify_crl_scope(crl: &CertificateRevocationList<'_>, cert: &Certificate<'_>) -> Option<()> {
-    // 1) Check that the cert's issuer corresponds to the CRL issuer.
-    //
-    // This only allows for "direct CRL" scenarios. 5280 specifies an "indirect CRL" where the
-    // DP's cRLIssuer field contains an issuer separate from the cert's own issuer. We may want to
-    // support indirect CRLs in the future, but any implementation would have to disallow their use
-    // in verifying with the CABF profile which prohibits iCRLs.
-    if cert.tbs_cert.issuer != crl.tbs_cert_list.issuer {
+    let cert_exts = cert.extensions().ok()?;
+    let cert_bc: BasicConstraints = cert_exts
+        .get_extension(&oid::BASIC_CONSTRAINTS_OID)?
+        .value()
+        .ok()?;
+
+    // Check bits on the iDP extension. CABF 7.2.2.1 specifies that full and complete CRLs may omit
+    // this extension; return successfully if this is the case.
+    let crl_exts = crl.extensions().ok()?;
+    let Some(idp) = crl_exts.get_extension(&oid::ISSUING_DISTRIBUTION_POINT_OID) else {
+        return Some(());
+    };
+    let idp: IssuingDistributionPoint<'_, Asn1Read> = idp.value().ok()?;
+
+    // Don't support reason code partitioning yet.
+    if idp.only_some_reasons.is_some() {
         return None;
     }
 
-    let cert_exts = cert.extensions().ok()?;
-    let cert_bc: BasicConstraints = cert_exts
-        .get_extension(&BASIC_CONSTRAINTS_OID)?
-        .value()
-        .ok()?;
+    // CABF 7.2 disallows iCRLs.
+    if idp.indirect_crl {
+        return None;
+    }
 
-    let crl_exts = crl.extensions().ok()?;
-    let idp: IssuingDistributionPoint<'_, Asn1Read> = crl_exts
-        .get_extension(&ISSUING_DISTRIBUTION_POINT_OID)?
-        .value()
-        .ok()?;
+    // Check iDP following 5280 6.3.3(b)(2).
 
     // If onlyContainsUserCerts is asserted in the iDP CRL extension, verify that the certificate
     // does not include the basic constraints extension with the cA boolean asserted.
@@ -121,13 +123,50 @@ fn verify_crl_scope(crl: &CertificateRevocationList<'_>, cert: &Certificate<'_>)
     }
 
     let dps: SequenceOfDistributionPoints<'_, Asn1Read> = cert_exts
-        .get_extension(&CRL_DISTRIBUTION_POINTS_OID)?
+        .get_extension(&oid::CRL_DISTRIBUTION_POINTS_OID)?
         .value()
         .ok()?;
 
-    // 2) Check DPs (where the cert expects us to find CRLs) against iDP (where the CRL says it's from).
+    // Check DPs (where the cert expects us to find CRLs) against iDP (where the CRL says it's from).
     if !crl_distribution_point_matches(idp, dps) {
         return None;
+    }
+
+    Some(())
+}
+
+fn verify_crl_shape(crl: &CertificateRevocationList<'_>) -> Option<()> {
+    // We only interpret X.509 v2 CRLs.
+    if crl.tbs_cert_list.version != Some(1) {
+        return None;
+    }
+
+    // Check for any unrecognized critical extensions.
+    for ext in crl.extensions().ok()?.iter() {
+        if !ext.critical {
+            continue;
+        }
+
+        match ext.extn_id {
+            oid::ISSUING_DISTRIBUTION_POINT_OID => (),
+            _ => return None,
+        }
+    }
+
+    // Do the same for each CRL entry.
+    let crl_entries = crl
+        .tbs_cert_list
+        .revoked_certificates
+        .as_ref()?
+        .unwrap_read()
+        .clone();
+    for entry in crl_entries.into_iter() {
+        for ext in entry.extensions().ok()?.iter() {
+            // We don't recognize any critical extensions.
+            if ext.critical {
+                return None;
+            }
+        }
     }
 
     Some(())
@@ -144,15 +183,12 @@ impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
         issuer: &VerificationCertificate<'chain, B>,
         policy: &Policy<'_, B>,
     ) -> ValidationResult<'chain, bool, B> {
-        let _issuer = issuer;
-        let _policy = policy;
-
         // Get the CRL out of our map of verified CRLs keyed by issuer.
         let crl = self
             .by_issuer
             .get(&cert.certificate().tbs_cert.issuer)
             .ok_or(ValidationError::new(
-                ValidationErrorKind::RevocationNotDetermined::<B>(
+                ValidationErrorKind::RevocationNotDetermined(
                     "applicable CRL not found for certificate".to_owned(),
                 ),
             ))?;
@@ -160,17 +196,20 @@ impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
         if verify_crl_scope(crl, cert.certificate()).is_none() {
             return Err(ValidationError::new(
                 ValidationErrorKind::RevocationNotDetermined(
-                    "CRL is not applicable to certificate".to_owned(),
+                    "applicable CRL not correctly scoped to certificate".to_owned(),
                 ),
             ));
         }
+
+        // Check CRL against policy time.
+        policy.permits_crl(crl)?;
 
         let revoked_certs =
             &crl.tbs_cert_list
                 .revoked_certificates
                 .as_ref()
                 .ok_or(ValidationError::new(
-                    ValidationErrorKind::RevocationNotDetermined::<B>("malformed CRL".to_owned()),
+                    ValidationErrorKind::RevocationNotDetermined("malformed CRL".to_owned()),
                 ))?;
 
         let is_revoked = revoked_certs.unwrap_read().clone().any(|c| {
@@ -182,13 +221,45 @@ impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
 }
 
 impl<'a> CrlRevocationChecker<'a> {
-    /// Constructs a new revocation checker.
+    /// Constructs a new revocation checker backed by CRLs in accordance with the RFC 5280 and CABF
+    /// CRL profiles.
+    ///
+    /// Accepts issuers and their associated CRLs. Each [`CrlRevocationChecker`] instance
+    /// must abide by the following constraints:
+    /// - Must contain at most one CRL per issuer.
+    /// - CRLs must not be partitioned by reason code.
+    /// - CRLs must be direct: the CRL's issuer must match the issuer of its revokees.
+    ///
+    /// In other words, each CRL should be authoritative for its issuer for the duration of the
+    /// CRL's effective window.
     pub fn new<B: CryptoOps>(
-        _ops: B,
-        _crls: impl IntoIterator<Item = (&'a Certificate<'a>, &'a CertificateRevocationList<'a>)>,
-    ) -> Self {
-        Self {
-            by_issuer: HashMap::new(),
+        ops: B,
+        crls: impl IntoIterator<Item = (&'a Certificate<'a>, &'a CertificateRevocationList<'a>)>,
+    ) -> Option<Self> {
+        let mut by_issuer = HashMap::new();
+
+        for (issuer, crl) in crls {
+            // 5280 4.2.1.3: check keyUsage.cRLSign if keyUsage is present.
+            if let Some(ext) = issuer.extensions().ok()?.get_extension(&oid::KEY_USAGE_OID) {
+                let ku: KeyUsage<'_> = ext.value().ok()?;
+
+                if !ku.crl_sign() {
+                    return None;
+                }
+            }
+
+            let key = ops.public_key(issuer).ok()?;
+            ops.verify_crl_signed_by(crl, &key).ok()?;
+            verify_crl_shape(crl)?;
+
+            let issuer_name = issuer.tbs_cert.subject.clone();
+
+            // Fail if we've already processed a CRL for this issuer.
+            if by_issuer.insert(issuer_name, crl).is_some() {
+                return None;
+            }
         }
+
+        Some(Self { by_issuer })
     }
 }
