@@ -88,7 +88,6 @@ impl CheckRevocation<PyCryptoOps> for pyo3::Py<PyRevocationChecker> {
     fn is_revoked<'chain>(
         &self,
         cert: &VerificationCertificate<'chain, PyCryptoOps>,
-        issuer: &VerificationCertificate<'chain, PyCryptoOps>,
         policy: &Policy<'_, PyCryptoOps>,
     ) -> ValidationResult<'chain, bool, PyCryptoOps> {
         pyo3::Python::attach(|py| {
@@ -96,7 +95,7 @@ impl CheckRevocation<PyCryptoOps> for pyo3::Py<PyRevocationChecker> {
                 .call_method1(
                     py,
                     pyo3::intern!(py, "is_revoked"),
-                    (cert.extra(), issuer.extra(), &policy.extra),
+                    (cert.extra(), &policy.extra),
                 )
                 .map_err(|e| {
                     ValidationError::new(

@@ -433,6 +433,14 @@ impl<'a, 'chain, B: CryptoOps> ChainBuilder<'a, 'chain, B> {
         name_chain: NameChain<'_, 'chain>,
         budget: &mut Budget,
     ) -> ValidationResult<'chain, Chain<'chain, B>, B> {
+        if let Some(revocation_checker) = self.revocation_checker {
+            if revocation_checker.is_revoked(working_cert, self.policy)? {
+                return Err(ValidationError::new(ValidationErrorKind::Other(
+                    "certificate revoked".to_string(),
+                )));
+            }
+        }
+
         if let Some(nc) = working_cert_extensions.get_extension(&NAME_CONSTRAINTS_OID) {
             name_chain.evaluate_constraints(&nc.value()?, budget)?;
         }
@@ -505,21 +513,6 @@ impl<'a, 'chain, B: CryptoOps> ChainBuilder<'a, 'chain, B> {
                         budget,
                     ) {
                         Ok(mut chain) => {
-                            if let Some(revocation_checker) = self.revocation_checker {
-                                // NOTE(tnytown): We propagate the error from the revocation checker
-                                // here; if it runs into an issue we want to provide visibility and
-                                // fail closed.
-                                if revocation_checker.is_revoked(
-                                    working_cert,
-                                    issuing_cert_candidate,
-                                    self.policy,
-                                )? {
-                                    return Err(ValidationError::new(ValidationErrorKind::Other(
-                                        "certificate revoked".to_string(),
-                                    )));
-                                }
-                            }
-
                             chain.push(working_cert.clone());
                             return Ok(chain);
                         }

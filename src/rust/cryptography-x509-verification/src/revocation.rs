@@ -26,7 +26,6 @@ pub trait CheckRevocation<B: CryptoOps> {
     fn is_revoked<'chain>(
         &self,
         cert: &VerificationCertificate<'chain, B>,
-        issuer: &VerificationCertificate<'chain, B>,
         policy: &Policy<'_, B>,
     ) -> ValidationResult<'chain, bool, B>;
 }
@@ -180,7 +179,6 @@ impl<'a, B: CryptoOps> CheckRevocation<B> for CrlRevocationChecker<'a> {
     fn is_revoked<'chain>(
         &self,
         cert: &VerificationCertificate<'chain, B>,
-        issuer: &VerificationCertificate<'chain, B>,
         policy: &Policy<'_, B>,
     ) -> ValidationResult<'chain, bool, B> {
         // Get the CRL out of our map of verified CRLs keyed by issuer.

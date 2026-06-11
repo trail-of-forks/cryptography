@@ -37,9 +37,7 @@ class DummyRevocationChecker(RevocationChecker):
         self._returns = returns
         self._raises = raises
 
-    def is_revoked(
-        self, cert: x509.Certificate, issuer: x509.Certificate, policy: Policy
-    ) -> bool:
+    def is_revoked(self, cert: x509.Certificate, policy: Policy) -> bool:
         if self._raises is not None:
             raise self._raises
         return self._returns
